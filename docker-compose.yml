@@ -6,6 +6,9 @@ services:
       POSTGRES_DB: vehicle_management
       POSTGRES_USER: vmgmt
       POSTGRES_PASSWORD: ${DB_PASSWORD:?run ./start-prod.sh, it creates .env}
+    ports:
+      # Loopback by default. Set DB_BIND=0.0.0.0 in .env to reach it from outside the VM.
+      - "${DB_BIND:-127.0.0.1}:${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
