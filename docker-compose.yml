@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vehicle_management
+      POSTGRES_USER: vmgmt
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?run ./start-prod.sh, it creates .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vmgmt -d vehicle_management"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      VM_DATABASE_URL: jdbc:postgresql://db:5432/vehicle_management
+      VM_DATABASE_USER: vmgmt
+      VM_DATABASE_PASSWORD: ${DB_PASSWORD}
+      VM_JWT_SECRET: ${VM_JWT_SECRET:?run ./start-prod.sh, it creates .env}
+      VM_ADMIN_USERNAME: ${VM_ADMIN_USERNAME:-}
+      VM_ADMIN_PASSWORD: ${VM_ADMIN_PASSWORD:-}
+      VM_ADMIN_MOBILE: ${VM_ADMIN_MOBILE:-}
+      VM_CORS_ORIGINS: ${VM_CORS_ORIGINS:-http://localhost:5173}
+      VM_IMAGE_BACKEND: local
+      VM_IMAGE_DIR: /data/uploads
+      VM_SEED_SAMPLE: "false"
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  # Optional HTTPS: enabled by start-prod.sh when DOMAIN is set in .env.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:

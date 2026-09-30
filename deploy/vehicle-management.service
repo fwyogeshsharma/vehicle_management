@@ -1,0 +1,24 @@
+[Unit]
+Description=Vehicle management backend
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=vmgmt
+Group=vmgmt
+EnvironmentFile=/etc/vehicle-management/env
+WorkingDirectory=/var/lib/vehicle-management
+ExecStart=/usr/bin/java -Xmx512m -jar /opt/vehicle-management/app.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+# Hardening: the service writes only to its own state directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/vehicle-management
+
+[Install]
+WantedBy=multi-user.target
