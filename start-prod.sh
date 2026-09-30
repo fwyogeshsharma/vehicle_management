@@ -4,8 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 command -v docker >/dev/null || { echo "Docker is not installed: curl -fsSL https://get.docker.com | sudo sh"; exit 1; }
-docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 plugin is missing"; exit 1; }
-DC="docker compose"; docker info >/dev/null 2>&1 || DC="sudo docker compose"
+# Works with the v2 plugin ("docker compose") or the older standalone v1 ("docker-compose").
+if docker compose version >/dev/null 2>&1; then DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
+else echo "No Compose found. Install one: sudo apt-get install -y docker-compose"; exit 1; fi
+SUDO=""; docker info >/dev/null 2>&1 || SUDO="sudo"; DC="$SUDO $DC"
 
 case "${1:-up}" in
   down) $DC --profile tls down; exit 0 ;;
@@ -37,7 +40,8 @@ $DC "${PROFILE[@]}" up -d --build
 
 echo ">> Waiting for the app to become healthy..."
 for _ in $(seq 1 60); do
-  s="$($DC ps --format '{{.Health}}' app 2>/dev/null || true)"
+  cid="$($DC ps -q app 2>/dev/null || true)"
+  s="$([ -n "$cid" ] && $SUDO docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true)"
   [ "$s" = healthy ] && break
   sleep 5
 done
