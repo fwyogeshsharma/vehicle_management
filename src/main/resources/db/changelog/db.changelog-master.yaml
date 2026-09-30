@@ -1,0 +1,16 @@
+# Liquibase master changelog.
+#
+# The schema itself is a formatted-SQL changelog rather than XML or YAML tags: see the header
+# of 001-init-schema.sql for why. This file exists to give a stable include order, so a later
+# change is a new file listed here rather than an edit to one Liquibase has already run and
+# checksummed.
+#
+# Rules for adding to this:
+#   - NEVER edit a changeset that has run anywhere. Liquibase checksums them, and an edited one
+#     fails the next deploy with a validation error. Add a new file.
+#   - Every changeset declares its own --rollback. Liquibase cannot infer one for raw SQL, and a
+#     changeset without one silently blocks rolling back everything applied after it.
+databaseChangeLog:
+  - includeAll:
+      path: db/changelog/changes
+      relativeToChangelogFile: false

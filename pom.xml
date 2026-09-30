@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.5</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.vehiclemanagement</groupId>
+  <artifactId>vehicle-management</artifactId>
+  <version>0.1.0</version>
+  <name>Vehicle Management</name>
+  <description>Companies, vehicles, the people attached to them, and where they run</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <!-- Defaults for the liquibase-maven-plugin; override on the command line. -->
+    <liquibase.url>jdbc:postgresql://127.0.0.1:5432/vehicle_management</liquibase.url>
+    <liquibase.username>postgres</liquibase.username>
+    <liquibase.password>postgres</liquibase.password>
+    <!-- Photo storage in production. Pinned via the BOM below, not per-artifact. -->
+    <google-cloud-libraries.version>26.49.0</google-cloud-libraries.version>
+  </properties>
+
+  <!--
+    Google's libraries disagree with each other about grpc and protobuf versions unless a BOM
+    pins them together; importing it is the supported way to avoid a NoSuchMethodError at the
+    first bucket call rather than at build time.
+  -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>${google-cloud-libraries.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <!--
+      JWT via the resource-server starter (Nimbus), not a third-party JWT library: it is in the
+      Boot BOM, gives NimbusJwtEncoder/JwtDecoder with HS256 out of the box, and brings the
+      standard 401-vs-403 handling with it rather than a hand-rolled filter that gets it wrong.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <!-- The contract the separate UI project builds against. -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <!--
+      Photo storage for the 'gcs' backend. The client is constructed only when that backend is
+      selected (see ImageStoreConfig), so local development and the test suite never need
+      Google credentials. The jar ships either way, which is the cost of not making this a
+      separate module.
+    -->
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-storage</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- Tests run against a REAL PostgreSQL, never H2. This schema leans on
+         num_nonnulls, stored generated columns, partial indexes, UNIQUE NULLS NOT
+         DISTINCT and the ~ regex operator; H2 has none of them, so an H2 suite would go
+         green while testing a database with none of the constraints. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      TestRestTemplate falls back to HttpURLConnection without this, and HttpURLConnection is
+      unusable for testing an HTTP API:
+        - it silently DROPS the restricted headers Origin, Access-Control-Request-Method and
+          Access-Control-Request-Headers, so every CORS assertion passes or fails for the wrong
+          reason;
+        - on a 401 it tries to retry authentication and throws "cannot retry due to server
+          authentication, in streaming mode" instead of returning the response, so a test cannot
+          even observe a 401 from a POST.
+      Both are properties of the client, not of this application. httpclient5 has neither.
+    -->
+    <dependency>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!--
+      Lorry receipts are downloaded as PDF, and this draws them.
+
+      PDFBox rather than an HTML-to-PDF renderer: those pull a CSS engine and a font stack to
+      re-solve a layout this document does not need solved. An LR is a form with fixed boxes,
+      so placing them directly is less code than making a renderer agree with the print
+      stylesheet, and the output is small, text-selectable and identical on every machine.
+
+      The cost is a second layout definition, since the on-screen print view stays HTML. They
+      describe the same document and can drift; LrPdfIT asserts the fields that must appear.
+    -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>2.0.17</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!--
+        The database tests are named *IT and run by Failsafe under `mvn verify`, not by
+        Surefire under `mvn test`. They need a real PostgreSQL (see DatabaseTest), so keeping
+        them out of `mvn test` leaves a fast, dependency-free unit run available.
+
+        `mvn verify` is the command that actually proves anything here.
+      -->
+      <!--
+        Liquibase from the command line, for the operations the application does not do at
+        start-up: rollback, status, and generating the SQL a DBA wants to read before a release.
+
+          mvn liquibase:status
+          mvn liquibase:rollbackCount -Dliquibase.rollbackCount=1
+          mvn liquibase:updateSQL          (writes the DDL out instead of running it)
+
+        Credentials come from -Dliquibase.password=... or the properties below; nothing is
+        committed.
+      -->
+      <plugin>
+        <groupId>org.liquibase</groupId>
+        <artifactId>liquibase-maven-plugin</artifactId>
+        <configuration>
+          <changeLogFile>src/main/resources/db/changelog/db.changelog-master.yaml</changeLogFile>
+          <url>${liquibase.url}</url>
+          <username>${liquibase.username}</username>
+          <password>${liquibase.password}</password>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,112 @@
+spring:
+  application:
+    name: vehicle-management
+  datasource:
+    # Local PostgreSQL; the database must exist (CREATE DATABASE vehicle_management;).
+    # 127.0.0.1 rather than localhost: on Windows localhost resolves to IPv6 ::1 first,
+    # and a Docker-published Postgres listens on IPv4 only.
+    url: ${VM_DATABASE_URL:jdbc:postgresql://127.0.0.1:5432/vehicle_management}
+    username: ${VM_DATABASE_USER:postgres}
+    password: ${VM_DATABASE_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      # Liquibase owns the schema. `validate` rather than `none` so an entity that has
+      # drifted from the changelog fails at boot instead of at the first query.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+spring.servlet.multipart:
+  # The default is 1MB per file and 10MB per request. A phone photo is several MB, so with the
+  # defaults every upload from the field would be rejected as too large.
+  max-file-size: ${VM_MAX_PHOTO_SIZE:12MB}
+  max-request-size: ${VM_MAX_UPLOAD_SIZE:60MB}
+
+server:
+  port: ${VM_PORT:8080}
+  error:
+    # GlobalExceptionHandler owns every error body. Whitelabel pages and Spring's default JSON
+    # would be a second shape for a client to parse.
+    whitelabel:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Health only. The rest of actuator is behind authentication anyway, but there is no
+        # reason to publish env, beans and mappings to anyone who can sign in.
+        include: health
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+vehicle-management:
+  # Reference data (states, cities, body types) is seeded at start-up, idempotently.
+  # Turn it off for a container that must not touch data.
+  seed-reference-data: ${VM_SEED_REFERENCE:true}
+  # Believable sample data to click around in. Development only; refuses a database that
+  # already has vehicles.
+  seed-sample-data: ${VM_SEED_SAMPLE:false}
+
+  jwt:
+    # NO DEFAULT, deliberately. Boot fails with a message naming this variable rather than
+    # starting with a key anyone could look up in the repository.
+    #   openssl rand -base64 48
+    secret: ${VM_JWT_SECRET:}
+    ttl-minutes: ${VM_JWT_TTL_MINUTES:480}
+
+  cors:
+    # The UI is a separate project on its own origin, so every call is preflighted. Exact
+    # origins only -- never a wildcard.
+    allowed-origins: ${VM_CORS_ORIGINS:http://localhost:5173}
+
+  company:
+    # Printed on every lorry slip. Configuration and not constants in LrPdf: these appear on a
+    # legal document and change when the firm moves office, which a redeploy is the wrong unit
+    # of change for. Defaults are the details on the stationery this design was taken from.
+    name: ${VM_COMPANY_NAME:TEZZZ TRANSPORT}
+    tagline: ${VM_COMPANY_TAGLINE:DRIVEN BY COMMITMENT}
+    proprietor: ${VM_COMPANY_PROPRIETOR:Tejpal Singh}
+    mobile: ${VM_COMPANY_MOBILE:087690-32586}
+    address: ${VM_COMPANY_ADDRESS:13/14 Gopal Nagar, VKI, Jaipur-302013}
+    slogan: ${VM_COMPANY_SLOGAN:SAFE  -  FAST  -  RELIABLE}
+    # Classpath resource. Blank prints the slip without a logo rather than failing.
+    logo: ${VM_COMPANY_LOGO:lr-logo.png}
+
+  intake:
+    # Photo bytes live in an object store, not PostgreSQL -- see ImageStore for why.
+    # 'local' writes to storage-dir; 'gcs' writes to the bucket below. Anything else fails
+    # startup rather than quietly writing photos somewhere that vanishes on the next restart.
+    storage-backend: ${VM_IMAGE_BACKEND:local}
+    storage-dir: ${VM_IMAGE_DIR:./uploads}
+    # Required when storage-backend is gcs. The OCR worker reads the SAME bucket by the same
+    # keys, with its own credentials -- see vehicleManagementOcr/ocr/storage.py.
+    gcs-bucket: ${VM_GCS_BUCKET:}
+    gcs-prefix: ${VM_GCS_PREFIX:}
+    max-images: ${VM_MAX_IMAGES:5}
+    max-image-mb: ${VM_MAX_IMAGE_MB:12}
+
+  admin:
+    # The first administrator, created only while nobody can already administer the system.
+    # All three are empty by default: no bootstrap rather than a known password.
+    username: ${VM_ADMIN_USERNAME:}
+    password: ${VM_ADMIN_PASSWORD:}
+    mobile: ${VM_ADMIN_MOBILE:}
+    name: ${VM_ADMIN_NAME:Administrator}
+
+logging:
+  level:
+    com.vehiclemanagement: INFO
