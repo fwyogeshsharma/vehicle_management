@@ -32,11 +32,14 @@ services:
       VM_ADMIN_PASSWORD: ${VM_ADMIN_PASSWORD:-}
       VM_ADMIN_MOBILE: ${VM_ADMIN_MOBILE:-}
       VM_CORS_ORIGINS: ${VM_CORS_ORIGINS:-http://localhost:5173}
-      VM_IMAGE_BACKEND: local
+      VM_IMAGE_BACKEND: ${VM_IMAGE_BACKEND:-local}
       VM_IMAGE_DIR: /data/uploads
+      VM_GCS_BUCKET: ${VM_GCS_BUCKET:-}
+      VM_GCS_PREFIX: ${VM_GCS_PREFIX:-}
       VM_SEED_SAMPLE: "false"
     volumes:
       - uploads:/data/uploads
+      - ./secrets:/secrets:ro
     ports:
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
     healthcheck:

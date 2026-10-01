@@ -94,7 +94,7 @@ vehicle-management:
     storage-dir: ${VM_IMAGE_DIR:./uploads}
     # Required when storage-backend is gcs. The OCR worker reads the SAME bucket by the same
     # keys, with its own credentials -- see vehicleManagementOcr/ocr/storage.py.
-    gcs-bucket: ${VM_GCS_BUCKET:}
+    gcs-bucket: ${VM_GCS_BUCKET:vehicle-management_1}
     gcs-prefix: ${VM_GCS_PREFIX:}
     max-images: ${VM_MAX_IMAGES:5}
     max-image-mb: ${VM_MAX_IMAGE_MB:12}

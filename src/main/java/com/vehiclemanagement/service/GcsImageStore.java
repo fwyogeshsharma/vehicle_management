@@ -6,6 +6,8 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
 import com.vehiclemanagement.exception.ApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Photos in a Google Cloud Storage bucket. Production.
@@ -21,6 +23,8 @@ import com.vehiclemanagement.exception.ApiException;
  * answer to the same question — and the one that deletes a photo a telecaller still needs.
  */
 public class GcsImageStore implements ImageStore {
+
+    private static final Logger log = LoggerFactory.getLogger(GcsImageStore.class);
 
     private final Storage storage;
     private final String bucket;
@@ -49,6 +53,7 @@ public class GcsImageStore implements ImageStore {
         try {
             storage.create(info, bytes);
         } catch (StorageException e) {
+            log.error("GCS put failed for key {} in bucket {}", key, bucket, e);
             // The message can name the bucket and the service account; that belongs in the log,
             // not in a response to a field executive's phone.
             throw new ApiException(500, "Could not store the photo.");
@@ -61,6 +66,7 @@ public class GcsImageStore implements ImageStore {
         try {
             blob = storage.get(blobId(key));
         } catch (StorageException e) {
+            log.error("GCS get failed for key {} in bucket {}", key, bucket, e);
             throw new ApiException(500, "Could not read the photo.");
         }
         if (blob == null || !blob.exists()) {
