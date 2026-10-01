@@ -1,6 +1,7 @@
 package com.vehiclemanagement.service;
 
 import com.vehiclemanagement.config.VehicleManagementProperties;
+import com.vehiclemanagement.domain.BodyType;
 import com.vehiclemanagement.domain.Company;
 import com.vehiclemanagement.domain.ProcessingStatus;
 import com.vehiclemanagement.domain.ReviewStatus;
@@ -8,6 +9,7 @@ import com.vehiclemanagement.domain.Vehicle;
 import com.vehiclemanagement.domain.VehicleIntake;
 import com.vehiclemanagement.exception.ApiException;
 import com.vehiclemanagement.exception.FieldValidationException;
+import com.vehiclemanagement.repo.BodyTypeRepository;
 import com.vehiclemanagement.repo.CompanyRepository;
 import com.vehiclemanagement.repo.UserRepository;
 import com.vehiclemanagement.repo.VehicleIntakeRepository;
@@ -84,11 +86,13 @@ public class IntakeService {
     // VehicleService.intake, so there remains exactly one path that creates a driver or company.
     private final CompanyRepository companies;
     private final UserRepository users;
+    private final BodyTypeRepository bodyTypes;
 
     public IntakeService(VehicleIntakeRepository intakes, VehicleRepository vehicles,
                          VehicleService vehicleService, ImageStore images,
                          VehicleManagementProperties properties,
-                         CompanyRepository companies, UserRepository users) {
+                         CompanyRepository companies, UserRepository users,
+                         BodyTypeRepository bodyTypes) {
         this.intakes = intakes;
         this.vehicles = vehicles;
         this.vehicleService = vehicleService;
@@ -96,6 +100,7 @@ public class IntakeService {
         this.config = properties.getIntake();
         this.companies = companies;
         this.users = users;
+        this.bodyTypes = bodyTypes;
     }
 
     public VehicleIntake get(long id) {
@@ -251,6 +256,7 @@ public class IntakeService {
         intake.setReportedDriverName(Normalizer.clean(report.driverName()));
         intake.setReportedLoadedStatus(Normalizer.clean(report.loadedStatus()));
         intake.setReportedBodyType(Normalizer.clean(report.bodyType()));
+        intake.setMatchedBodyTypeId(matchBodyType(intake.getReportedBodyType()));
         intake.setReportedCapacity(capacityOrNull(report.capacity()));
         intake.setReportedMaterialType(Normalizer.clean(report.materialType()));
         intake.setReportedNoOfWheels(wheelsInRange(report.noOfWheels()));
@@ -272,6 +278,15 @@ public class IntakeService {
      * <p>Anything longer than the column is not a phone number by any reading, so it is
      * dropped rather than truncated: a truncated number looks dialable and is not.
      */
+    /** The active master row whose name equals the app's text, ignoring case; else null. */
+    private Long matchBodyType(String reported) {
+        if (reported == null) {
+            return null;
+        }
+        return bodyTypes.findByNameKey(reported.strip().toLowerCase())
+                .filter(BodyType::isActive).map(BodyType::getId).orElse(null);
+    }
+
     /** Dropped rather than truncated when longer than the column: a cut-off capacity reads as a different one. */
     private static String capacityOrNull(String raw) {
         String c = Normalizer.clean(raw);

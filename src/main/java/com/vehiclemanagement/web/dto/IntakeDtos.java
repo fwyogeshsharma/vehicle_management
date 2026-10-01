@@ -53,6 +53,7 @@ public final class IntakeDtos {
                           String editedBy,
                           /** The above resolved against the OCR reads. What to display. */
                           String plate, List<String> mobiles, String company, String driverName,
+                          Long bodyTypeId, String capacity,
                           short attempts, String processingError,
                           Long vehicleId, String reviewedBy, String reviewNote,
                           OffsetDateTime capturedAt, OffsetDateTime createdAt,
@@ -70,6 +71,7 @@ public final class IntakeDtos {
                     i.getEditedDriverName(), i.getEditedBodyTypeId(), i.getEditedCapacity(),
                     i.getEditedPlaces(), i.getEditedBy(),
                     i.plate(), i.mobiles(), i.company(), i.driverName(),
+                    i.bodyTypeId(), i.capacity(),
                     i.getAttempts(), i.getProcessingError(),
                     i.getVehicleId(), i.getReviewedBy(), i.getReviewNote(),
                     i.getCapturedAt(), i.getCreatedAt(), i.getProcessedAt());

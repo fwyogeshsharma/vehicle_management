@@ -90,6 +90,10 @@ public class VehicleIntake {
     @Column(name = "reported_body_type", length = 64)
     private String reportedBodyType;
 
+    /** The master row the reported body type matched at upload; editedBodyTypeId wins over it. */
+    @Column(name = "matched_body_type_id")
+    private Long matchedBodyTypeId;
+
     /** Capacity as the app spells it, free text. The CSR confirms it into editedCapacity. */
     @Column(name = "reported_capacity", length = 32)
     private String reportedCapacity;
@@ -280,6 +284,8 @@ public class VehicleIntake {
     public void setReportedLoadedStatus(String v) { this.reportedLoadedStatus = v; }
     public String getReportedBodyType() { return reportedBodyType; }
     public void setReportedBodyType(String v) { this.reportedBodyType = v; }
+    public Long getMatchedBodyTypeId() { return matchedBodyTypeId; }
+    public void setMatchedBodyTypeId(Long v) { this.matchedBodyTypeId = v; }
     public String getReportedCapacity() { return reportedCapacity; }
     public void setReportedCapacity(String v) { this.reportedCapacity = v; }
     public String getReportedMaterialType() { return reportedMaterialType; }
@@ -341,6 +347,17 @@ public class VehicleIntake {
 
     public String company() {
         return firstPresent(editedCompany, ocrCompany, reportedCompany);
+    }
+
+    /** What to show for body type: the CSR's pick, else the master row the app's text matched. */
+    public Long bodyTypeId() {
+        return editedBodyTypeId != null ? editedBodyTypeId : matchedBodyTypeId;
+    }
+
+    /** What to show for capacity: the CSR's value, else what the app reported. */
+    public String capacity() {
+        return editedCapacity != null && !editedCapacity.isBlank() ? editedCapacity
+                : reportedCapacity == null || reportedCapacity.isBlank() ? null : reportedCapacity;
     }
 
     /**
