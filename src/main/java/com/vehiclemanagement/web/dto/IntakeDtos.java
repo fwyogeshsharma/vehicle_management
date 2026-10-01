@@ -38,7 +38,7 @@ public final class IntakeDtos {
                           ProcessingStatus processingStatus, ReviewStatus reviewStatus,
                           int photoCount,
                           String reportedPlate, String reportedMobile, String reportedCompany,
-                          String reportedBy, String location,
+                          String reportedBy, String reportedDriverName, String reportedBodyType, String location,
                           String ocrPlate, List<String> ocrMobiles, String ocrCompany,
                           String ocrConfidence,
                           /**
@@ -61,7 +61,7 @@ public final class IntakeDtos {
             return new Summary(i.getId(),
                     i.getProcessingStatus(), i.getReviewStatus(), i.getImageKeys().size(),
                     i.getReportedPlate(), i.getReportedMobile(), i.getReportedCompany(),
-                    i.getReportedBy(), i.getLocation(),
+                    i.getReportedBy(), i.getReportedDriverName(), i.getReportedBodyType(), i.getLocation(),
                     i.getOcrPlate(), i.getOcrMobiles(), i.getOcrCompany(),
                     i.getOcrConfidence(),
                     i.getEditedPlate(), i.getEditedMobiles(), i.getEditedCompany(),

@@ -337,9 +337,16 @@ public class VehicleIntake {
         return firstPresent(editedCompany, ocrCompany, reportedCompany);
     }
 
-    /** No fallback: nothing else in the system knows a driver's name. */
+    /**
+     * The CSR's name for the driver, else what the uploader typed. OCR cannot read a name.
+     * Unlike plate or company, a blank edit does NOT win: the form sends "" for an untouched
+     * name field, and "no driver" is not something a CSR can mean.
+     */
     public String driverName() {
-        return editedDriverName == null || editedDriverName.isBlank() ? null : editedDriverName;
+        if (editedDriverName != null && !editedDriverName.isBlank()) {
+            return editedDriverName;
+        }
+        return reportedDriverName == null || reportedDriverName.isBlank() ? null : reportedDriverName;
     }
 
     /** Blank counts as absent for the fallback, but an explicit blank correction still wins. */

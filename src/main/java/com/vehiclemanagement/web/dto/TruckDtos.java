@@ -185,7 +185,7 @@ public final class TruckDtos {
         }
 
         private static String driverName(VehicleIntake i) {
-            return i.driverName() != null ? i.driverName() : i.getReportedDriverName();
+            return i.driverName();
         }
 
         private static String firstMobile(VehicleIntake i) {
