@@ -90,6 +90,10 @@ public class VehicleIntake {
     @Column(name = "reported_body_type", length = 64)
     private String reportedBodyType;
 
+    /** Capacity as the app spells it, free text. The CSR confirms it into editedCapacity. */
+    @Column(name = "reported_capacity", length = 32)
+    private String reportedCapacity;
+
     /** What it carries -- 'Steel', 'Cement'. Cargo-fit context for the call. */
     @Column(name = "reported_material_type", length = 64)
     private String reportedMaterialType;
@@ -276,6 +280,8 @@ public class VehicleIntake {
     public void setReportedLoadedStatus(String v) { this.reportedLoadedStatus = v; }
     public String getReportedBodyType() { return reportedBodyType; }
     public void setReportedBodyType(String v) { this.reportedBodyType = v; }
+    public String getReportedCapacity() { return reportedCapacity; }
+    public void setReportedCapacity(String v) { this.reportedCapacity = v; }
     public String getReportedMaterialType() { return reportedMaterialType; }
     public void setReportedMaterialType(String v) { this.reportedMaterialType = v; }
     public Short getReportedNoOfWheels() { return reportedNoOfWheels; }

@@ -167,14 +167,15 @@ public class IntakeService {
                          String reporterMobile, OffsetDateTime capturedAt,
                          String location, Double latitude, Double longitude,
                          String driverName, String loadedStatus, String bodyType,
-                         String materialType, Short noOfWheels, String axleType) {
+                         String materialType, Short noOfWheels, String axleType,
+                         String capacity) {
 
         /** The nine fields the CSR-facing upload endpoint sends; the app-only six stay null. */
         public static Report of(String plate, String mobile, String company, String reportedBy,
                                 String reporterMobile, OffsetDateTime capturedAt,
                                 String location, Double latitude, Double longitude) {
             return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
-                    location, latitude, longitude, null, null, null, null, null, null);
+                    location, latitude, longitude, null, null, null, null, null, null, null);
         }
     }
 
@@ -250,6 +251,7 @@ public class IntakeService {
         intake.setReportedDriverName(Normalizer.clean(report.driverName()));
         intake.setReportedLoadedStatus(Normalizer.clean(report.loadedStatus()));
         intake.setReportedBodyType(Normalizer.clean(report.bodyType()));
+        intake.setReportedCapacity(capacityOrNull(report.capacity()));
         intake.setReportedMaterialType(Normalizer.clean(report.materialType()));
         intake.setReportedNoOfWheels(wheelsInRange(report.noOfWheels()));
         intake.setReportedAxleType(Normalizer.clean(report.axleType()));
@@ -270,6 +272,12 @@ public class IntakeService {
      * <p>Anything longer than the column is not a phone number by any reading, so it is
      * dropped rather than truncated: a truncated number looks dialable and is not.
      */
+    /** Dropped rather than truncated when longer than the column: a cut-off capacity reads as a different one. */
+    private static String capacityOrNull(String raw) {
+        String c = Normalizer.clean(raw);
+        return c == null || c.length() > 32 ? null : c;
+    }
+
     private static String reportedDigits(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;

@@ -102,6 +102,7 @@ public class TruckCompatController {
             @RequestParam(name = "driver_name", required = false) String driverName,
             @RequestParam(name = "number_of_wheels", required = false) Integer numberOfWheels,
             @RequestParam(name = "axle_type", required = false) String axleType,
+            @RequestParam(name = "capacity", required = false) String capacity,
             @RequestParam(name = "location", required = false) String location,
             @RequestParam(name = "latitude", required = false) Double latitude,
             @RequestParam(name = "longitude", required = false) Double longitude,
@@ -128,7 +129,7 @@ public class TruckCompatController {
                 vehicleNumber, phoneNumber, companyName, attributedTo,
                 senderMobile, parseCapturedAt(capturedAt), location, latitude, longitude,
                 driverName, loadedStatus, bodyType, materialType,
-                wheels(numberOfWheels), axleType));
+                wheels(numberOfWheels), axleType, capacity));
 
         return ResponseEntity.accepted().body(TruckDtos.Accepted.of(saved));
     }
