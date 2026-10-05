@@ -36,6 +36,11 @@ public class GeoService {
         return cities.search(clean == null ? null : "%" + clean + "%", stateId, pageable);
     }
 
+    /** Every active city, all states — one query, grouped by the caller. */
+    public List<City> listActiveCities() {
+        return cities.findByActiveTrueOrderByNameAsc();
+    }
+
     public List<City> listCities(long stateId) {
         return cities.findByStateIdOrderByNameAsc(stateId);
     }

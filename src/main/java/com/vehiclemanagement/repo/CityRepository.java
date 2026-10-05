@@ -25,6 +25,9 @@ public interface CityRepository extends JpaRepository<City, Long> {
 
     List<City> findByStateIdOrderByNameAsc(Long stateId);
 
+    /** Every active city in one query, for the combined masters payload. */
+    List<City> findByActiveTrueOrderByNameAsc();
+
     /** Casts before every null test -- see UserRepository.search for why they are not optional. */
     @Query(value = """
             SELECT ci.* FROM cities ci
