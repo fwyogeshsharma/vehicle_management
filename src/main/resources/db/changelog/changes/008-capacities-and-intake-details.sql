@@ -57,17 +57,15 @@ INSERT INTO capacities (label, tons) VALUES
 
 --changeset vehiclemanagement:18-intake-call-details
 --comment Body type, capacity and preferred locations, learned on the call
---rollback ALTER TABLE vehicle_intake DROP COLUMN body_type_id,
---rollback                            DROP COLUMN capacity_id,
+--rollback ALTER TABLE vehicle_intake DROP COLUMN edited_body_type_id,
+--rollback                            DROP COLUMN edited_capacity,
 --rollback                            DROP COLUMN edited_places;
 
 ALTER TABLE vehicle_intake
-    -- One column each, not a reported/matched/edited trio. Both are ids into their masters: the
-    -- mobile app sends the id at upload and the CSR overwrites it on the call. RESTRICT,
-    -- matching vehicles.body_type_id: retiring one must not silently blank it on work in
-    -- progress. (vehicles.capacity itself stays free text; completion writes the label.)
-    ADD COLUMN body_type_id BIGINT,
-    ADD COLUMN capacity_id  BIGINT,
+    -- RESTRICT, matching vehicles.body_type_id: retiring a body type must not silently blank it
+    -- on work in progress.
+    ADD COLUMN edited_body_type_id BIGINT REFERENCES body_types (id),
+    ADD COLUMN edited_capacity     VARCHAR(32),
     -- [{"state_id": 12, "city_id": 340}, ...]; a null city means the whole state.
     --
     -- JSONB rather than a child table, because these are not the vehicle's locations yet and
@@ -76,12 +74,6 @@ ALTER TABLE vehicle_intake
     -- place belongs in gets applied. This column is a CSR's notes until then, and giving notes
     -- their own table with the same shape as the real one is how the two get confused.
     ADD COLUMN edited_places       JSONB;
-
-ALTER TABLE vehicle_intake
-    ADD CONSTRAINT fk_intake_body_type
-        FOREIGN KEY (body_type_id) REFERENCES body_types (id) ON DELETE RESTRICT,
-    ADD CONSTRAINT fk_intake_capacity
-        FOREIGN KEY (capacity_id) REFERENCES capacities (id) ON DELETE RESTRICT;
 
 COMMENT ON COLUMN vehicle_intake.edited_places IS
     'Where the driver says the truck runs, as [{state_id, city_id|null}]. Notes, not locations: '
