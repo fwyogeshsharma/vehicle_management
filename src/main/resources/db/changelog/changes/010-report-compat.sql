@@ -8,23 +8,19 @@
 -- discarding what a field executive typed is worse than not asking for it: the CSR calling the
 -- driver would see an empty screen for facts the reporter had already supplied.
 --
--- All six are `reported_` and free text, matching the columns already here. That prefix is the
+-- The `reported_` ones are free text, matching the columns already here. That prefix is the
 -- whole point -- these are a human's claim from the roadside, and they sit beside `ocr_` (what
 -- the machine read) and `edited_` (what the CSR concluded) without any of the three being
 -- mistaken for another.
 --
--- **Deliberately not typed against the masters.** reported_body_type is VARCHAR, not a
--- body_type_id FK, and reported_capacity-like values stay text. The app owns its own pick
--- lists, FreightDesk validated none of them, and an FK here would reject a submission because
--- a phone's dropdown said "Container" where body_types says "CONTAINER" -- losing the photo
--- over a spelling. The CSR resolves it into edited_body_type_id on the call, and THAT column
--- is the foreign key.
+-- Body type and capacity are NOT here: they are single columns, `body_type_id` and `capacity`,
+-- added in 008. The app's body type is resolved against the master at upload, and an
+-- unrecognised name leaves body_type_id null rather than costing us the photo.
 
 --changeset vehiclemanagement:20-report-compat
 --comment Fields the mobile app's existing report contract sends that had no column
 --rollback ALTER TABLE vehicle_intake DROP COLUMN reported_driver_name,
 --rollback                            DROP COLUMN reported_loaded_status,
---rollback                            DROP COLUMN reported_body_type,
 --rollback                            DROP COLUMN reported_material_type,
 --rollback                            DROP COLUMN reported_no_of_wheels,
 --rollback                            DROP COLUMN reported_axle_type;
@@ -35,7 +31,6 @@ ALTER TABLE vehicle_intake
     -- 'loaded' | 'unloaded' as the app spells it. Unconstrained on purpose: a CHECK here would
     -- reject a future third option from an app release we do not control.
     ADD COLUMN reported_loaded_status VARCHAR(16),
-    ADD COLUMN reported_body_type     VARCHAR(64),
     -- What it carries, e.g. 'Steel', 'Cement'. Helps the CSR judge cargo fit before ringing.
     ADD COLUMN reported_material_type VARCHAR(64),
     ADD COLUMN reported_no_of_wheels  SMALLINT,
@@ -47,8 +42,3 @@ ALTER TABLE vehicle_intake
     ADD CONSTRAINT ck_intake_reported_wheels
         CHECK (reported_no_of_wheels IS NULL
                OR reported_no_of_wheels BETWEEN 2 AND 32);
-
-COMMENT ON COLUMN vehicle_intake.reported_body_type IS
-    'Body type as the mobile app spells it, free text. NOT body_types.id -- the app owns its '
-    'pick list and a mismatch must not cost us the photo. The CSR maps it to '
-    'edited_body_type_id on the call.';

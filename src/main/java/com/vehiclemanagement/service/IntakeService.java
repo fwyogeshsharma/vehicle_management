@@ -10,6 +10,8 @@ import com.vehiclemanagement.domain.VehicleIntake;
 import com.vehiclemanagement.exception.ApiException;
 import com.vehiclemanagement.exception.FieldValidationException;
 import com.vehiclemanagement.repo.BodyTypeRepository;
+import com.vehiclemanagement.repo.CapacityRepository;
+import com.vehiclemanagement.domain.Capacity;
 import com.vehiclemanagement.repo.CompanyRepository;
 import com.vehiclemanagement.repo.UserRepository;
 import com.vehiclemanagement.repo.VehicleIntakeRepository;
@@ -87,12 +89,13 @@ public class IntakeService {
     private final CompanyRepository companies;
     private final UserRepository users;
     private final BodyTypeRepository bodyTypes;
+    private final CapacityRepository capacities;
 
     public IntakeService(VehicleIntakeRepository intakes, VehicleRepository vehicles,
                          VehicleService vehicleService, ImageStore images,
                          VehicleManagementProperties properties,
                          CompanyRepository companies, UserRepository users,
-                         BodyTypeRepository bodyTypes) {
+                         BodyTypeRepository bodyTypes, CapacityRepository capacities) {
         this.intakes = intakes;
         this.vehicles = vehicles;
         this.vehicleService = vehicleService;
@@ -101,6 +104,7 @@ public class IntakeService {
         this.companies = companies;
         this.users = users;
         this.bodyTypes = bodyTypes;
+        this.capacities = capacities;
     }
 
     public VehicleIntake get(long id) {
@@ -171,9 +175,9 @@ public class IntakeService {
     public record Report(String plate, String mobile, String company, String reportedBy,
                          String reporterMobile, OffsetDateTime capturedAt,
                          String location, Double latitude, Double longitude,
-                         String driverName, String loadedStatus, String bodyType,
+                         String driverName, String loadedStatus, Long bodyTypeId,
                          String materialType, Short noOfWheels, String axleType,
-                         String capacity) {
+                         Long capacityId) {
 
         /** The nine fields the CSR-facing upload endpoint sends; the app-only six stay null. */
         public static Report of(String plate, String mobile, String company, String reportedBy,
@@ -255,9 +259,8 @@ public class IntakeService {
         intake.setLongitude(longitude);
         intake.setReportedDriverName(Normalizer.clean(report.driverName()));
         intake.setReportedLoadedStatus(Normalizer.clean(report.loadedStatus()));
-        intake.setReportedBodyType(Normalizer.clean(report.bodyType()));
-        intake.setMatchedBodyTypeId(matchBodyType(intake.getReportedBodyType()));
-        intake.setReportedCapacity(capacityOrNull(report.capacity()));
+        intake.setBodyTypeId(activeBodyTypeOrNull(report.bodyTypeId()));
+        intake.setCapacityId(activeCapacityOrNull(report.capacityId()));
         intake.setReportedMaterialType(Normalizer.clean(report.materialType()));
         intake.setReportedNoOfWheels(wheelsInRange(report.noOfWheels()));
         intake.setReportedAxleType(Normalizer.clean(report.axleType()));
@@ -278,19 +281,19 @@ public class IntakeService {
      * <p>Anything longer than the column is not a phone number by any reading, so it is
      * dropped rather than truncated: a truncated number looks dialable and is not.
      */
-    /** The active master row whose name equals the app's text, ignoring case; else null. */
-    private Long matchBodyType(String reported) {
-        if (reported == null) {
-            return null;
-        }
-        return bodyTypes.findByNameKey(reported.strip().toLowerCase())
-                .filter(BodyType::isActive).map(BodyType::getId).orElse(null);
+    /**
+     * The id the app sent, if it names an active body type; else null.
+     * Dropped rather than rejected: an id from a stale pick list must not cost us the photo.
+     */
+    private Long activeBodyTypeOrNull(Long id) {
+        return id == null ? null
+                : bodyTypes.findById(id).filter(BodyType::isActive).map(BodyType::getId).orElse(null);
     }
 
-    /** Dropped rather than truncated when longer than the column: a cut-off capacity reads as a different one. */
-    private static String capacityOrNull(String raw) {
-        String c = Normalizer.clean(raw);
-        return c == null || c.length() > 32 ? null : c;
+    /** As {@link #activeBodyTypeOrNull}, for the capacities pick list. */
+    private Long activeCapacityOrNull(Long id) {
+        return id == null ? null
+                : capacities.findById(id).filter(Capacity::isActive).map(Capacity::getId).orElse(null);
     }
 
     private static String reportedDigits(String raw) {
@@ -420,11 +423,19 @@ public class IntakeService {
     @Transactional
     public VehicleIntake correct(long id, String actor, String plate, List<String> mobiles,
                                  String company, String driverName, Long bodyTypeId,
-                                 String capacity, List<Map<String, Object>> places) {
+                                 Long capacityId, List<Map<String, Object>> places) {
         VehicleIntake intake = get(id);
         if (intake.getReviewStatus() != ReviewStatus.PENDING) {
             throw new ApiException.Conflict("This intake was already "
                     + intake.getReviewStatus().name().toLowerCase() + "; it cannot be edited.");
+        }
+
+        // A correction is a person's explicit choice, so an unknown id is an error here (0 clears).
+        if (bodyTypeId != null && bodyTypeId != 0 && !bodyTypes.existsById(bodyTypeId)) {
+            throw new FieldValidationException("body_type_id", "No such body type.");
+        }
+        if (capacityId != null && capacityId != 0 && !capacities.existsById(capacityId)) {
+            throw new FieldValidationException("capacity_id", "No such capacity.");
         }
 
         List<String> cleanMobiles = null;
@@ -436,7 +447,7 @@ public class IntakeService {
                     .toList();
         }
         intake.applyCorrection(corrected(plate, true), cleanMobiles, corrected(company, false),
-                corrected(driverName, false), bodyTypeId, corrected(capacity, false), places,
+                corrected(driverName, false), bodyTypeId, capacityId, places,
                 actor);
         log.info("intake {} corrected by {}", id, actor);
         return intakes.saveAndFlush(intake);

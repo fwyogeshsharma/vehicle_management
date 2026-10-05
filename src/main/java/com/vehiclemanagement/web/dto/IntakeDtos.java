@@ -38,8 +38,8 @@ public final class IntakeDtos {
                           ProcessingStatus processingStatus, ReviewStatus reviewStatus,
                           int photoCount,
                           String reportedPlate, String reportedMobile, String reportedCompany,
-                          String reportedBy, String reportedDriverName, String reportedBodyType,
-                          String reportedCapacity, String location,
+                          String reportedBy, String reportedDriverName,
+                          String location,
                           String ocrPlate, List<String> ocrMobiles, String ocrCompany,
                           String ocrConfidence,
                           /**
@@ -48,12 +48,13 @@ public final class IntakeDtos {
                            * as a CSR deliberately clearing a bad read.
                            */
                           String editedPlate, List<String> editedMobiles, String editedCompany,
-                          String editedDriverName, Long editedBodyTypeId,
-                          String editedCapacity, List<Map<String, Object>> editedPlaces,
+                          String editedDriverName,
+                          List<Map<String, Object>> editedPlaces,
                           String editedBy,
                           /** The above resolved against the OCR reads. What to display. */
                           String plate, List<String> mobiles, String company, String driverName,
-                          Long bodyTypeId, String capacity,
+                          /** Single columns: the app's value at upload, then the CSR's. */
+                          Long bodyTypeId, Long capacityId,
                           short attempts, String processingError,
                           Long vehicleId, String reviewedBy, String reviewNote,
                           OffsetDateTime capturedAt, OffsetDateTime createdAt,
@@ -63,15 +64,15 @@ public final class IntakeDtos {
             return new Summary(i.getId(),
                     i.getProcessingStatus(), i.getReviewStatus(), i.getImageKeys().size(),
                     i.getReportedPlate(), i.getReportedMobile(), i.getReportedCompany(),
-                    i.getReportedBy(), i.getReportedDriverName(), i.getReportedBodyType(),
-                    i.getReportedCapacity(), i.getLocation(),
+                    i.getReportedBy(), i.getReportedDriverName(),
+                    i.getLocation(),
                     i.getOcrPlate(), i.getOcrMobiles(), i.getOcrCompany(),
                     i.getOcrConfidence(),
                     i.getEditedPlate(), i.getEditedMobiles(), i.getEditedCompany(),
-                    i.getEditedDriverName(), i.getEditedBodyTypeId(), i.getEditedCapacity(),
+                    i.getEditedDriverName(),
                     i.getEditedPlaces(), i.getEditedBy(),
                     i.plate(), i.mobiles(), i.company(), i.driverName(),
-                    i.bodyTypeId(), i.capacity(),
+                    i.getBodyTypeId(), i.getCapacityId(),
                     i.getAttempts(), i.getProcessingError(),
                     i.getVehicleId(), i.getReviewedBy(), i.getReviewNote(),
                     i.getCapturedAt(), i.getCreatedAt(), i.getProcessedAt());
@@ -126,7 +127,7 @@ public final class IntakeDtos {
      * request that only fixes the company would silently wipe the plate.
      */
     public record CorrectRequest(String plate, List<String> mobiles, String company,
-                                 String driverName, Long bodyTypeId, String capacity,
+                                 String driverName, Long bodyTypeId, Long capacityId,
                                  /** [{state_id, city_id|null}] — a null city is the whole state. */
                                  List<Map<String, Object>> places) {
     }

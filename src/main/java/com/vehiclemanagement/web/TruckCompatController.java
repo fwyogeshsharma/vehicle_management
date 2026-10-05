@@ -1,8 +1,10 @@
 package com.vehiclemanagement.web;
 
+import com.vehiclemanagement.domain.BodyType;
 import com.vehiclemanagement.domain.User;
 import com.vehiclemanagement.domain.VehicleIntake;
 import com.vehiclemanagement.exception.ApiException;
+import com.vehiclemanagement.repo.BodyTypeRepository;
 import com.vehiclemanagement.repo.UserRepository;
 import com.vehiclemanagement.security.Principal;
 import com.vehiclemanagement.service.IntakeService;
@@ -56,10 +58,13 @@ public class TruckCompatController {
 
     private final IntakeService intake;
     private final UserRepository users;
+    private final BodyTypeRepository bodyTypes;
 
-    public TruckCompatController(IntakeService intake, UserRepository users) {
+    public TruckCompatController(IntakeService intake, UserRepository users,
+                                 BodyTypeRepository bodyTypes) {
         this.intake = intake;
         this.users = users;
+        this.bodyTypes = bodyTypes;
     }
 
     /**
@@ -97,12 +102,12 @@ public class TruckCompatController {
             @RequestParam(name = "phone_number", required = false) String phoneNumber,
             @RequestParam(name = "vehicle_number", required = false) String vehicleNumber,
             @RequestParam(name = "loaded_status", required = false) String loadedStatus,
-            @RequestParam(name = "body_type", required = false) String bodyType,
+            @RequestParam(name = "body_type_id", required = false) Long bodyTypeId,
             @RequestParam(name = "material_type", required = false) String materialType,
             @RequestParam(name = "driver_name", required = false) String driverName,
             @RequestParam(name = "number_of_wheels", required = false) Integer numberOfWheels,
             @RequestParam(name = "axle_type", required = false) String axleType,
-            @RequestParam(name = "capacity", required = false) String capacity,
+            @RequestParam(name = "capacity_id", required = false) Long capacityId,
             @RequestParam(name = "location", required = false) String location,
             @RequestParam(name = "latitude", required = false) Double latitude,
             @RequestParam(name = "longitude", required = false) Double longitude,
@@ -128,8 +133,8 @@ public class TruckCompatController {
         VehicleIntake saved = intake.upload(images, new IntakeService.Report(
                 vehicleNumber, phoneNumber, companyName, attributedTo,
                 senderMobile, parseCapturedAt(capturedAt), location, latitude, longitude,
-                driverName, loadedStatus, bodyType, materialType,
-                wheels(numberOfWheels), axleType, capacity));
+                driverName, loadedStatus, bodyTypeId, materialType,
+                wheels(numberOfWheels), axleType, capacityId));
 
         return ResponseEntity.accepted().body(TruckDtos.Accepted.of(saved));
     }
@@ -145,7 +150,10 @@ public class TruckCompatController {
                     + "or FAILED means stop.")
     @GetMapping("/api/trucks/{id}")
     public TruckDtos.Truck truck(@PathVariable long id) {
-        return TruckDtos.Truck.of(intake.get(id));
+        VehicleIntake row = intake.get(id);
+        String bodyType = row.getBodyTypeId() == null ? null
+                : bodyTypes.findById(row.getBodyTypeId()).map(BodyType::getName).orElse(null);
+        return TruckDtos.Truck.of(row, bodyType);
     }
 
     /**

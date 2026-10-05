@@ -117,7 +117,8 @@ public final class TruckDtos {
                          */
                         @JsonProperty("image_urls") List<String> imageUrls) {
 
-        public static Truck of(VehicleIntake i) {
+        /** {@code bodyTypeName} is the master name for the intake's body type, null if none. */
+        public static Truck of(VehicleIntake i, String bodyTypeName) {
             Map<String, Object> raw = i.getOcrRaw() == null ? Map.of() : i.getOcrRaw();
             List<String> urls = new ArrayList<>();
             for (int idx = 0; idx < i.getImageKeys().size(); idx++) {
@@ -143,7 +144,7 @@ public final class TruckDtos {
                     null,               // other_text: superseded by ocr_raw
                     null, null, null,   // frames / first_seen_sec / last_seen_sec: video-only
                     i.getReportedLoadedStatus(),
-                    i.getReportedBodyType(),
+                    bodyTypeName,
                     i.getReportedMaterialType(),
                     driverName(i),
                     i.getLocation(),

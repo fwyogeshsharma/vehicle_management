@@ -216,7 +216,6 @@ class TruckCompatIT extends ApiTest {
                     "phone_number", "9811008120",
                     "vehicle_number", "RJ14CA1234",
                     "loaded_status", "loaded",
-                    "body_type", "Container",
                     "material_type", "Steel",
                     "driver_name", "Ramesh Kumar",
                     "number_of_wheels", "12",
@@ -233,7 +232,6 @@ class TruckCompatIT extends ApiTest {
                     .containsEntry("reported_mobile", "9811008120")
                     .containsEntry("reported_plate", "RJ14CA1234")
                     .containsEntry("reported_loaded_status", "loaded")
-                    .containsEntry("reported_body_type", "Container")
                     .containsEntry("reported_material_type", "Steel")
                     .containsEntry("reported_driver_name", "Ramesh Kumar")
                     .containsEntry("reported_no_of_wheels", 12)

@@ -212,7 +212,7 @@ public class IntakeController {
                                       @RequestBody IntakeDtos.CorrectRequest request) {
         return IntakeDtos.Summary.from(intake.correct(id, Principal.username(jwt),
                 request.plate(), request.mobiles(), request.company(), request.driverName(),
-                request.bodyTypeId(), request.capacity(), request.places()));
+                request.bodyTypeId(), request.capacityId(), request.places()));
     }
 
     @Operation(summary = "Throw an intake away",

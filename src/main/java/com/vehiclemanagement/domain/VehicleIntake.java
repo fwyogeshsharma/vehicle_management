@@ -87,16 +87,17 @@ public class VehicleIntake {
     @Column(name = "reported_loaded_status", length = 16)
     private String reportedLoadedStatus;
 
-    @Column(name = "reported_body_type", length = 64)
-    private String reportedBodyType;
+    /**
+     * One column, not a reported/matched/edited trio: the app's body type resolved against the
+     * master at upload (null when nothing matched), then whatever the CSR picks. RESTRICT, as on
+     * vehicles: retiring a body type must not blank it.
+     */
+    @Column(name = "body_type_id")
+    private Long bodyTypeId;
 
-    /** The master row the reported body type matched at upload; editedBodyTypeId wins over it. */
-    @Column(name = "matched_body_type_id")
-    private Long matchedBodyTypeId;
-
-    /** Capacity as the app spells it, free text. The CSR confirms it into editedCapacity. */
-    @Column(name = "reported_capacity", length = 32)
-    private String reportedCapacity;
+    /** A row of the capacities pick list: the app's at upload, then the CSR's. */
+    @Column(name = "capacity_id")
+    private Long capacityId;
 
     /** What it carries -- 'Steel', 'Cement'. Cargo-fit context for the call. */
     @Column(name = "reported_material_type", length = 64)
@@ -203,14 +204,6 @@ public class VehicleIntake {
     @Column(name = "edited_driver_name", length = 128)
     private String editedDriverName;
 
-    /** Chosen from the body_types master. RESTRICT, as on vehicles: retiring one must not blank it. */
-    @Column(name = "edited_body_type_id")
-    private Long editedBodyTypeId;
-
-    /** The label from the capacities pick list, stored verbatim — see that table's comment. */
-    @Column(name = "edited_capacity", length = 32)
-    private String editedCapacity;
-
     /**
      * Where the driver says the truck runs: {@code [{state_id, city_id|null}]}, a null city
      * meaning the whole state.
@@ -282,12 +275,10 @@ public class VehicleIntake {
     public void setReportedDriverName(String v) { this.reportedDriverName = v; }
     public String getReportedLoadedStatus() { return reportedLoadedStatus; }
     public void setReportedLoadedStatus(String v) { this.reportedLoadedStatus = v; }
-    public String getReportedBodyType() { return reportedBodyType; }
-    public void setReportedBodyType(String v) { this.reportedBodyType = v; }
-    public Long getMatchedBodyTypeId() { return matchedBodyTypeId; }
-    public void setMatchedBodyTypeId(Long v) { this.matchedBodyTypeId = v; }
-    public String getReportedCapacity() { return reportedCapacity; }
-    public void setReportedCapacity(String v) { this.reportedCapacity = v; }
+    public Long getBodyTypeId() { return bodyTypeId; }
+    public void setBodyTypeId(Long v) { this.bodyTypeId = v; }
+    public Long getCapacityId() { return capacityId; }
+    public void setCapacityId(Long v) { this.capacityId = v; }
     public String getReportedMaterialType() { return reportedMaterialType; }
     public void setReportedMaterialType(String v) { this.reportedMaterialType = v; }
     public Short getReportedNoOfWheels() { return reportedNoOfWheels; }
@@ -318,8 +309,6 @@ public class VehicleIntake {
     public List<String> getEditedMobiles() { return editedMobiles; }
     public String getEditedCompany() { return editedCompany; }
     public String getEditedDriverName() { return editedDriverName; }
-    public Long getEditedBodyTypeId() { return editedBodyTypeId; }
-    public String getEditedCapacity() { return editedCapacity; }
     public List<Map<String, Object>> getEditedPlaces() { return editedPlaces; }
     public String getEditedBy() { return editedBy; }
     public OffsetDateTime getEditedAt() { return editedAt; }
@@ -347,17 +336,6 @@ public class VehicleIntake {
 
     public String company() {
         return firstPresent(editedCompany, ocrCompany, reportedCompany);
-    }
-
-    /** What to show for body type: the CSR's pick, else the master row the app's text matched. */
-    public Long bodyTypeId() {
-        return editedBodyTypeId != null ? editedBodyTypeId : matchedBodyTypeId;
-    }
-
-    /** What to show for capacity: the CSR's value, else what the app reported. */
-    public String capacity() {
-        return editedCapacity != null && !editedCapacity.isBlank() ? editedCapacity
-                : reportedCapacity == null || reportedCapacity.isBlank() ? null : reportedCapacity;
     }
 
     /**
@@ -393,14 +371,14 @@ public class VehicleIntake {
      * that distinction a form that only edits the company would silently wipe the plate.
      */
     public void applyCorrection(String plate, List<String> mobiles, String company,
-                                String driverName, Long bodyTypeId, String capacity,
+                                String driverName, Long bodyTypeId, Long capacityId,
                                 List<Map<String, Object>> places, String by) {
         if (bodyTypeId != null) {
             // 0 is how a cleared dropdown arrives; anything else is a real choice.
-            this.editedBodyTypeId = bodyTypeId == 0 ? null : bodyTypeId;
+            this.bodyTypeId = bodyTypeId == 0 ? null : bodyTypeId;
         }
-        if (capacity != null) {
-            this.editedCapacity = capacity.isBlank() ? null : capacity;
+        if (capacityId != null) {
+            this.capacityId = capacityId == 0 ? null : capacityId;
         }
         if (places != null) {
             this.editedPlaces = List.copyOf(places);
