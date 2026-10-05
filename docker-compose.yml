@@ -49,6 +49,29 @@ services:
       retries: 12
       start_period: 40s
 
+  # Optional browser DB viewer: ./start-prod.sh does not start it; run
+  #   docker compose --profile pgadmin up -d pgadmin
+  # Published on loopback only -- a database admin console must not sit on the open internet.
+  # Reach it from your machine with an SSH tunnel:  ssh -L 5050:127.0.0.1:5050 user@server
+  # then open http://localhost:5050. Sign in with PGADMIN_EMAIL / PGADMIN_PASSWORD from .env;
+  # the "vehicle_management" server is pre-registered and asks for DB_PASSWORD once.
+  pgadmin:
+    image: dpage/pgadmin4:8
+    profiles: ["pgadmin"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    ports:
+      - "${PGADMIN_BIND:-127.0.0.1}:${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - ./deploy/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - pgadmin_data:/var/lib/pgadmin
+
   # Optional HTTPS: enabled by start-prod.sh when DOMAIN is set in .env.
   caddy:
     image: caddy:2-alpine
@@ -68,3 +91,4 @@ volumes:
   pgdata:
   uploads:
   caddy_data:
+  pgadmin_data:
