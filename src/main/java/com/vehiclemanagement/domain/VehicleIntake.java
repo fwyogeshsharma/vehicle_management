@@ -69,6 +69,10 @@ public class VehicleIntake {
     @Column(name = "reported_company", length = 160)
     private String reportedCompany;
 
+    /** The company's own number as the app sent it -- not the truck's or the driver's. */
+    @Column(name = "reported_company_mobile", length = 16)
+    private String reportedCompanyMobile;
+
     @Column(name = "reported_by", length = 128)
     private String reportedBy;
 
@@ -194,6 +198,10 @@ public class VehicleIntake {
     @Column(name = "edited_company", length = 160)
     private String editedCompany;
 
+    /** The CSR's company number. Kept out of {@code edited_mobiles}, which loses box positions. */
+    @Column(name = "edited_company_mobile", length = 16)
+    private String editedCompanyMobile;
+
     /**
      * The driver's name, as the CSR took it down.
      *
@@ -273,6 +281,8 @@ public class VehicleIntake {
     public void setReportedMobile(String v) { this.reportedMobile = v; }
     public String getReportedCompany() { return reportedCompany; }
     public void setReportedCompany(String v) { this.reportedCompany = v; }
+    public String getReportedCompanyMobile() { return reportedCompanyMobile; }
+    public void setReportedCompanyMobile(String v) { this.reportedCompanyMobile = v; }
     public String getReportedBy() { return reportedBy; }
     public void setReportedBy(String v) { this.reportedBy = v; }
     public String getReporterMobile() { return reporterMobile; }
@@ -314,6 +324,7 @@ public class VehicleIntake {
     public String getEditedPlate() { return editedPlate; }
     public List<String> getEditedMobiles() { return editedMobiles; }
     public String getEditedCompany() { return editedCompany; }
+    public String getEditedCompanyMobile() { return editedCompanyMobile; }
     public String getEditedDriverName() { return editedDriverName; }
     public List<Map<String, Object>> getEditedPlaces() { return editedPlaces; }
     public String getEditedBy() { return editedBy; }
@@ -342,6 +353,11 @@ public class VehicleIntake {
 
     public String company() {
         return firstPresent(editedCompany, ocrCompany, reportedCompany);
+    }
+
+    /** The company's number: the CSR's, else what the app sent. OCR cannot tell which is whose. */
+    public String companyMobile() {
+        return firstPresent(editedCompanyMobile, reportedCompanyMobile);
     }
 
     /**
@@ -378,7 +394,11 @@ public class VehicleIntake {
      */
     public void applyCorrection(String plate, List<String> mobiles, String company,
                                 String driverName, Long bodyTypeId, Long capacityId,
-                                List<Map<String, Object>> places, String by) {
+                                List<Map<String, Object>> places, String companyMobile,
+                                String by) {
+        if (companyMobile != null) {
+            this.editedCompanyMobile = companyMobile;
+        }
         if (bodyTypeId != null) {
             // 0 is how a cleared dropdown arrives; anything else is a real choice.
             this.bodyTypeId = bodyTypeId == 0 ? null : bodyTypeId;

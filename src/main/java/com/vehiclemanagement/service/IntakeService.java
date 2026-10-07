@@ -177,14 +177,21 @@ public class IntakeService {
                          String location, Double latitude, Double longitude,
                          String driverName, String loadedStatus, Long bodyTypeId,
                          String materialType, Short noOfWheels, String axleType,
-                         Long capacityId) {
+                         Long capacityId, String companyMobile) {
 
-        /** The nine fields the CSR-facing upload endpoint sends; the app-only six stay null. */
+        /** The nine fields the CSR-facing upload endpoint sends; the app-only ones stay null. */
         public static Report of(String plate, String mobile, String company, String reportedBy,
                                 String reporterMobile, OffsetDateTime capturedAt,
                                 String location, Double latitude, Double longitude) {
             return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
-                    location, latitude, longitude, null, null, null, null, null, null, null);
+                    location, latitude, longitude, null, null, null, null, null, null, null, null);
+        }
+
+        /** As {@link #of}, plus the company's own number. */
+        public Report withCompanyMobile(String companyMobile) {
+            return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
+                    location, latitude, longitude, driverName, loadedStatus, bodyTypeId,
+                    materialType, noOfWheels, axleType, capacityId, companyMobile);
         }
     }
 
@@ -251,6 +258,7 @@ public class IntakeService {
         intake.setReportedPlate(Normalizer.clean(reportedPlate));
         intake.setReportedMobile(reportedDigits(report.mobile()));
         intake.setReportedCompany(Normalizer.clean(reportedCompany));
+        intake.setReportedCompanyMobile(reportedDigits(report.companyMobile()));
         intake.setReportedBy(Normalizer.clean(reportedBy));
         intake.setReporterMobile(Normalizer.optionalMobile(reporterMobile, "reporter_mobile"));
         intake.setCapturedAt(capturedAt == null ? OffsetDateTime.now() : capturedAt);
@@ -424,7 +432,8 @@ public class IntakeService {
     @Transactional
     public VehicleIntake correct(long id, String actor, String plate, List<String> mobiles,
                                  String company, String driverName, Long bodyTypeId,
-                                 Long capacityId, List<Map<String, Object>> places) {
+                                 Long capacityId, List<Map<String, Object>> places,
+                                 String companyMobile) {
         VehicleIntake intake = get(id);
         if (intake.getReviewStatus() != ReviewStatus.PENDING) {
             throw new ApiException.Conflict("This intake was already "
@@ -449,7 +458,7 @@ public class IntakeService {
         }
         intake.applyCorrection(corrected(plate, true), cleanMobiles, corrected(company, false),
                 corrected(driverName, false), bodyTypeId, capacityId, places,
-                actor);
+                correctedMobile(companyMobile), actor);
         log.info("intake {} corrected by {}", id, actor);
         return intakes.saveAndFlush(intake);
     }
@@ -462,6 +471,18 @@ public class IntakeService {
      * which is stored, and is how "the machine read a plate but there isn't one" is recorded.
      * Collapsing those two into null would make clearing a bad read impossible.
      */
+    /** Digits only; null stays null (not mentioned), blank becomes "" (cleared). */
+    private static String correctedMobile(String value) {
+        if (value == null) {
+            return null;
+        }
+        String digits = value.replaceAll("[^0-9]", "");
+        if (digits.length() > 16) {
+            throw new FieldValidationException("company_mobile", "That is too long for a phone number.");
+        }
+        return digits;
+    }
+
     private static String corrected(String value, boolean upperCase) {
         if (value == null) {
             return null;

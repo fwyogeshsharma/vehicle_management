@@ -113,7 +113,8 @@ public class TruckCompatController {
             @RequestParam(name = "longitude", required = false) Double longitude,
             @RequestParam(name = "captured_at", required = false) String capturedAt,
             @RequestParam(name = "reported_by", required = false) String reportedBy,
-            @RequestParam(name = "company_name", required = false) String companyName) {
+            @RequestParam(name = "company_name", required = false) String companyName,
+            @RequestParam(name = "company_mobile", required = false) String companyMobile) {
 
         // 400, not this service's usual 422 for a field error. FreightDesk's contract names
         // 400 for "more than 5 images, or no image was decodable", and the app's upload screen
@@ -134,7 +135,7 @@ public class TruckCompatController {
                 vehicleNumber, phoneNumber, companyName, attributedTo,
                 senderMobile, parseCapturedAt(capturedAt), location, latitude, longitude,
                 driverName, loadedStatus, bodyTypeId, materialType,
-                wheels(numberOfWheels), axleType, capacityId));
+                wheels(numberOfWheels), axleType, capacityId, companyMobile));
 
         return ResponseEntity.accepted().body(TruckDtos.Accepted.of(saved));
     }
