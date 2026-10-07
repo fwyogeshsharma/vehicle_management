@@ -79,9 +79,7 @@ services:
     restart: unless-stopped
     depends_on: [app]
     environment:
-      DOMAIN: ${DOMAIN:-localhost}
-      UI_UPSTREAM: ${UI_UPSTREAM:-glittery-faun-ee6d6f.netlify.app}
-    ports:
+      DOMAIN: ${DOMAIN:-localhost}    ports:
       - "80:80"
       - "443:443"
     volumes:

@@ -6,9 +6,9 @@
    database, role and secrets, installs the systemd unit and starts it on :8080.
 4. Edit `/etc/vehicle-management/env`: set `VM_ADMIN_USERNAME/PASSWORD/MOBILE` (first admin) and
    `VM_CORS_ORIGINS` (exact UI origin), then `sudo systemctl restart vehicle-management`.
-5. Put nginx/Caddy with TLS in front and open only 80/443; keep 8080 and 5432 closed. One hostname,
-   `https://trucks.rollingradius.com`, serves both: DNS points at the VM, Caddy answers `/api/*`
-   itself and proxies everything else to the Netlify-hosted UI (`UI_UPSTREAM`); the proxy must send
+5. Put nginx/Caddy with TLS in front and open only 80/443; keep 8080 and 5432 closed. The API is
+   `https://api.trucks.rollingradius.com` (DNS A record -> the VM); the UI stays on Netlify at
+   `https://trucks.rollingradius.com`, which is the `VM_CORS_ORIGINS` value; the proxy must send
    `X-Forwarded-Proto` / `X-Forwarded-Host` (Caddy does by default).
 
 Logs: `journalctl -u vehicle-management -f`. Health: `curl localhost:8080/actuator/health`.
