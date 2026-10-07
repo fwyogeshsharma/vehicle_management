@@ -106,12 +106,14 @@ public class VehicleService {
             throw new FieldValidationException("owner",
                     "A company cannot drive its own vehicle. Assign a driver instead.");
         }
-        String reg = Normalizer.registration(registrationNumber, "registration_number");
-        if (vehicles.existsByRegistrationNumber(reg)) {
+        // Both optional: the plate and the body type are often unknown when the truck is first
+        // recorded. Given, each is still checked; see changeset 023.
+        String reg = Normalizer.optionalRegistration(registrationNumber, "registration_number");
+        if (reg != null && vehicles.existsByRegistrationNumber(reg)) {
             throw new ApiException.Conflict("Vehicle " + reg + " is already registered.");
         }
         requireExactlyOneOwner(ownerCompanyId, ownerUserId);
-        requireBodyType(bodyTypeId);
+        checkBodyType(bodyTypeId);
         validateDimensions(axles, wheels, capacity, lengthFt);
 
         return ConstraintErrors.translating(() -> {
@@ -489,13 +491,25 @@ public class VehicleService {
      * Edit the truck itself. Not its owner and not its drivers — those are separate facts with
      * separate rules, and folding them in here would make a typo in the capacity field capable
      * of selling the vehicle.
+     *
+     * <p>{@code registrationNumber} is how a plate reaches a vehicle registered without one. A
+     * blank one leaves the plate as it is rather than clearing it: a plate once known does not
+     * become unknown, and older callers do not send the field at all.
      */
     @Transactional
-    public Vehicle update(long vehicleId, Long bodyTypeId, Short axles, Short wheels,
-                          String capacity, BigDecimal lengthFt, String notes) {
+    public Vehicle update(long vehicleId, String registrationNumber, Long bodyTypeId,
+                          Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                          String notes) {
         Vehicle v = get(vehicleId);
-        requireBodyType(bodyTypeId);
+        String reg = Normalizer.optionalRegistration(registrationNumber, "registration_number");
+        if (reg != null && vehicles.existsByRegistrationNumberAndIdNot(reg, vehicleId)) {
+            throw new ApiException.Conflict("Vehicle " + reg + " is already registered.");
+        }
+        checkBodyType(bodyTypeId);
         validateDimensions(axles, wheels, capacity, lengthFt);
+        if (reg != null) {
+            v.setRegistrationNumber(reg);
+        }
         v.setBodyTypeId(bodyTypeId);
         v.setNoOfAxles(axles);
         v.setNoOfWheels(wheels);
@@ -641,9 +655,10 @@ public class VehicleService {
         }
     }
 
-    private void requireBodyType(Long bodyTypeId) {
+    /** Null is allowed — "not known yet". A given id must be a real, current body type. */
+    private void checkBodyType(Long bodyTypeId) {
         if (bodyTypeId == null) {
-            throw new FieldValidationException("body_type_id", "Pick a body type.");
+            return;
         }
         BodyType bt = bodyTypes.findById(bodyTypeId).orElseThrow(
                 () -> new FieldValidationException("body_type_id", "That body type does not exist."));
@@ -672,18 +687,15 @@ public class VehicleService {
      * The bounds that are NOT database CHECKs, and why.
      *
      * <p>The schema rejects the physically impossible — a 40-axle truck, an odd number of wheels.
-     * These are the merely unusual: required-on-create, and a wheels-per-axle ratio. They live
+     * These are the merely unusual: a required capacity, and a wheels-per-axle ratio. They live
      * here because the first partial third-party import will arrive missing half of them, and a
      * NOT NULL you later relax is a migration you did not need.
+     *
+     * <p>Axles and wheels are optional: the desk rarely has them on the first call. The ratio
+     * is only checked when both are given.
      */
     private void validateDimensions(Short axles, Short wheels, String capacity, BigDecimal lengthFt) {
-        if (axles == null) {
-            throw new FieldValidationException("no_of_axles", "Number of axles is required.");
-        }
-        if (wheels == null) {
-            throw new FieldValidationException("no_of_wheels", "Number of wheels is required.");
-        }
-        if (wheels < axles * 2 || wheels > axles * 4) {
+        if (axles != null && wheels != null && (wheels < axles * 2 || wheels > axles * 4)) {
             throw new FieldValidationException("no_of_wheels",
                     "A " + axles + "-axle vehicle has between " + (axles * 2) + " and "
                     + (axles * 4) + " wheels.");

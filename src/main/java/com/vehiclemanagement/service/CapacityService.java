@@ -41,6 +41,27 @@ public class CapacityService {
                 () -> new ApiException.NotFound("Capacity " + id + " not found."));
     }
 
+    /**
+     * The text to store in {@code vehicles.capacity} for a request that may name a pick-list
+     * entry, free text, or neither.
+     *
+     * <p>The UI sends {@code capacity_id} from the dropdown; older callers and imports send the
+     * text. An id wins, and resolves to its label — still text on the vehicle, so nothing points
+     * at this table (see the class comment).
+     */
+    public String labelFor(Long capacityId, String capacity) {
+        if (capacityId == null) {
+            return capacity;
+        }
+        Capacity c = capacities.findById(capacityId).orElseThrow(
+                () -> new FieldValidationException("capacity_id", "No such capacity."));
+        if (!c.isActive()) {
+            throw new FieldValidationException("capacity_id",
+                    c.getLabel() + " is retired; pick a current capacity.");
+        }
+        return c.getLabel();
+    }
+
     @Transactional
     public Capacity create(String label, BigDecimal tons) {
         String clean = Normalizer.clean(label);

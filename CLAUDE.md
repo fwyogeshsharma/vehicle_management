@@ -104,10 +104,11 @@ Field executives photograph trucks; an OCR worker reads them; a CSR rings the dr
 the result into a vehicle. `vehicle_intake` (changeset 005) holds that work in progress, and it
 is modelled on FreightDesk's `trucks` row.
 
-**It is a separate table from `vehicles`, and must stay one.** A vehicle needs a canonical unique
-registration number, a body type and exactly one owner. At upload time there is none of those,
-and OCR may never supply them. Putting a "pending" status on the register would mean relaxing
-every constraint the register exists for. (FreightDesk has no equivalent split because its
+**It is a separate table from `vehicles`, and must stay one.** A vehicle needs exactly one owner,
+and a registration number that, when given, is canonical and unique. At upload time there is no
+owner, and OCR may never supply one. Putting a "pending" status on the register would mean
+relaxing every constraint the register exists for. (The plate and body type themselves became
+optional on `vehicles` in changeset 023 — the desk often creates the truck before it has either.) (FreightDesk has no equivalent split because its
 `trucks` table *is* the sightings log — two required columns, everything else nullable.)
 
 **Two status columns, and they are independent.** `processing_status` is what the machine has
@@ -288,9 +289,17 @@ number is checked twice, differently: the database enforces only that what is st
 canonical, and `Normalizer` holds the full format — which **rejects the BH series**, recorded as
 a known gap in `NormalizerTest`.
 
-Likewise `no_of_axles`, `no_of_wheels`, `capacity` and `length_ft` are nullable in the database
-and required by `VehicleService`. The first partial third-party import will arrive missing half
-of them.
+Likewise `capacity` is nullable in the database and required by `VehicleService`. The first
+partial third-party import will arrive missing half of these. `registration_number`,
+`body_type_id`, `no_of_axles`, `no_of_wheels` and `length_ft` are optional everywhere; when
+given they are still validated (plate format and uniqueness, a current body type, the
+wheels-per-axle ratio when both are present).
+
+The vehicle requests take capacity as either `capacity_id` (a pick-list entry, which the UI
+sends) or free-text `capacity` (imports, older callers). `CapacityService.labelFor` turns an id
+into its label, so `vehicles.capacity` stays text and nothing points at `capacities`.
+`PUT /api/vehicles/{id}` takes an optional `registration_number`: it adds or corrects a plate,
+and a blank one keeps the current plate rather than clearing it.
 
 ## Tests
 

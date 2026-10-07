@@ -94,6 +94,11 @@ public final class Normalizer {
         return registration(raw, "registration_number");
     }
 
+    /** Blank becomes null, otherwise validated like {@link #registration(String, String)}. */
+    public static String optionalRegistration(String raw, String field) {
+        return raw == null || raw.isBlank() ? null : registration(raw, field);
+    }
+
     public static String username(String raw) {
         String value = raw == null ? "" : raw.trim().toLowerCase();
         if (!USERNAME.matcher(value).matches()) {

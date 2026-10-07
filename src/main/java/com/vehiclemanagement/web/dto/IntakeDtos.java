@@ -4,7 +4,6 @@ import com.vehiclemanagement.domain.ProcessingStatus;
 import com.vehiclemanagement.domain.ReviewStatus;
 import com.vehiclemanagement.domain.VehicleIntake;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -101,8 +100,10 @@ public final class IntakeDtos {
      * <p>Deliberately the same shape as {@link VehicleDtos.IntakeRequest} — the CSR is filling
      * in the very same form, just with some boxes already populated from the photo.
      */
-    public record CompleteRequest(@NotBlank String registrationNumber,
-                                  @NotNull Long bodyTypeId,
+    public record CompleteRequest(/** Optional: the plate may not be known yet. */
+                                  String registrationNumber,
+                                  /** Optional: null means "not known yet". */
+                                  Long bodyTypeId,
                                   @NotBlank String driverName,
                                   @NotBlank String driverMobile,
                                   /**
@@ -117,7 +118,10 @@ public final class IntakeDtos {
                                   String companyMobile,
                                   Short noOfAxles,
                                   Short noOfWheels,
+                                  /** Free text. Ignored when {@code capacityId} is given. */
                                   String capacity,
+                                  /** A pick-list entry; stored on the vehicle as its label. */
+                                  Long capacityId,
                                   BigDecimal lengthFt,
                                   List<VehicleDtos.Place> places) {
     }

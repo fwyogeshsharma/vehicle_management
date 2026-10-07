@@ -91,6 +91,44 @@ class VehicleApiIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("capacity_id from the pick list is stored as that entry's label")
+    void a_capacity_id_is_stored_as_its_label() {
+        long eighteen = jdbc.queryForObject(
+                "SELECT id FROM capacities WHERE label = '18 Ton'", Long.class);
+
+        ResponseEntity<JsonNode> created = post("/api/vehicles", token, body(
+                "owner_user_id", driverId, "capacity_id", eighteen));
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody().get("capacity").asText()).isEqualTo("18 Ton");
+        assertThat(post("/api/vehicles", token, body("owner_user_id", driverId,
+                "capacity_id", 999999)).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    @DisplayName("a vehicle registered without a plate can be given one later, and keeps it")
+    void a_plate_is_added_by_editing() {
+        registerOwnerDriven();                       // holds MH12AB1234
+        long id = idOf(post("/api/vehicles", token, body(
+                "owner_user_id", driverId, "capacity", "16 Ton")));
+
+        ResponseEntity<JsonNode> taken = put("/api/vehicles/" + id, token, body(
+                "registration_number", "MH12AB1234", "capacity", "16 Ton"));
+        assertThat(taken.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        ResponseEntity<JsonNode> added = put("/api/vehicles/" + id, token, body(
+                "registration_number", "mh-12-ab-5678", "capacity", "16 Ton"));
+        assertThat(added.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(added.getBody().get("registration_number").asText()).isEqualTo("MH12AB5678");
+
+        // An edit that does not mention the plate leaves it alone.
+        ResponseEntity<JsonNode> later = put("/api/vehicles/" + id, token, body(
+                "capacity", "16 Ton", "notes", "repainted"));
+        assertThat(later.getBody().get("registration_number").asText()).isEqualTo("MH12AB5678");
+    }
+
+    @Test
     @DisplayName("an unregistered vehicle is a 404 with a readable message, not a stack trace")
     void a_missing_vehicle_is_a_clean_404() {
         ResponseEntity<JsonNode> missing = get("/api/vehicles/999999", token);

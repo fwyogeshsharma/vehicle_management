@@ -84,14 +84,19 @@ public final class VehicleDtos {
      *                        Indian trucking. Explicit rather than guessed from the person's
      *                        type, because an owner who employs a driver is just as real.
      */
-    public record CreateRequest(@NotBlank String registrationNumber,
-                                @NotNull Long bodyTypeId,
+    public record CreateRequest(/** Optional: the plate may not be known yet. */
+                                String registrationNumber,
+                                /** Optional: null means "not known yet". */
+                                Long bodyTypeId,
                                 Long ownerCompanyId,
                                 Long ownerUserId,
                                 boolean ownerAlsoDrives,
                                 Short noOfAxles,
                                 Short noOfWheels,
+                                /** Free text. Ignored when {@code capacityId} is given. */
                                 String capacity,
+                                /** A pick-list entry; stored on the vehicle as its label. */
+                                Long capacityId,
                                 BigDecimal lengthFt,
                                 /**
                                  * Where it runs. Only for a person-owned vehicle — a company's
@@ -110,8 +115,10 @@ public final class VehicleDtos {
      *
      * <p>Leave {@code companyName} out and the driver owns the truck — the owner-operator.
      */
-    public record IntakeRequest(@NotBlank String registrationNumber,
-                                @NotNull Long bodyTypeId,
+    public record IntakeRequest(/** Optional: the plate may not be known yet. */
+                                String registrationNumber,
+                                /** Optional: null means "not known yet". */
+                                Long bodyTypeId,
                                 @NotBlank String driverName,
                                 @NotBlank String driverMobile,
                                 /**
@@ -124,7 +131,10 @@ public final class VehicleDtos {
                                 String companyMobile,
                                 Short noOfAxles,
                                 Short noOfWheels,
+                                /** Free text. Ignored when {@code capacityId} is given. */
                                 String capacity,
+                                /** A pick-list entry; stored on the vehicle as its label. */
+                                Long capacityId,
                                 BigDecimal lengthFt,
                                 /**
                                  * Where it runs. With a company name these become the
@@ -135,10 +145,20 @@ public final class VehicleDtos {
     }
 
     /** The truck's own attributes. Owner and drivers have their own endpoints. */
-    public record UpdateRequest(@NotNull Long bodyTypeId,
+    public record UpdateRequest(/**
+                                 * Optional. Blank or absent leaves the plate as it is: this is
+                                 * how a plate is added to a vehicle registered without one, not
+                                 * a way to remove it.
+                                 */
+                                String registrationNumber,
+                                /** Optional: null means "not known yet". */
+                                Long bodyTypeId,
                                 Short noOfAxles,
                                 Short noOfWheels,
+                                /** Free text. Ignored when {@code capacityId} is given. */
                                 String capacity,
+                                /** A pick-list entry; stored on the vehicle as its label. */
+                                Long capacityId,
                                 BigDecimal lengthFt,
                                 String notes) {
     }

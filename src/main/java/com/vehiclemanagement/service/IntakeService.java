@@ -511,14 +511,18 @@ public class IntakeService {
         VehicleIntake intake = get(id);
         requireUnreviewed(intake, "complete");
 
-        String canonical = Normalizer.registration(registrationNumber, "registration_number");
-        vehicles.findByRegistrationNumber(canonical).ifPresent(existing -> {
-            // A plain 409 from uq_vehicles_reg would be true but unhelpful. The CSR needs to
-            // know the truck is already on file so they can open it rather than retype it.
-            throw new ApiException.Conflict(
-                    "Vehicle " + canonical + " is already registered (id " + existing.getId()
-                    + "). Discard this photo, or open the existing vehicle.");
-        });
+        // Optional: a vehicle may be created before anyone has the plate (changeset 023).
+        String canonical = Normalizer.optionalRegistration(registrationNumber,
+                "registration_number");
+        if (canonical != null) {
+            vehicles.findByRegistrationNumber(canonical).ifPresent(existing -> {
+                // A plain 409 from uq_vehicles_reg would be true but unhelpful. The CSR needs to
+                // know the truck is already on file so they can open it rather than retype it.
+                throw new ApiException.Conflict(
+                        "Vehicle " + canonical + " is already registered (id " + existing.getId()
+                        + "). Discard this photo, or open the existing vehicle.");
+            });
+        }
 
         Vehicle vehicle = vehicleService.intake(canonical, bodyTypeId, contacts,
                 axles, wheels, capacity, lengthFt, places == null ? List.of() : places);

@@ -2,6 +2,7 @@ package com.vehiclemanagement.web;
 
 import com.vehiclemanagement.domain.VehicleIntake;
 import com.vehiclemanagement.security.Principal;
+import com.vehiclemanagement.service.CapacityService;
 import com.vehiclemanagement.service.IntakeService;
 import com.vehiclemanagement.web.dto.IntakeDtos;
 import com.vehiclemanagement.web.dto.VehicleDtos;
@@ -37,9 +38,11 @@ import java.util.List;
 public class IntakeController {
 
     private final IntakeService intake;
+    private final CapacityService capacities;
 
-    public IntakeController(IntakeService intake) {
+    public IntakeController(IntakeService intake, CapacityService capacities) {
         this.intake = intake;
+        this.capacities = capacities;
     }
 
     // ── the field app ───────────────────────────────────────────────────────────
@@ -200,7 +203,8 @@ public class IntakeController {
                         request.companyMobile() != null && !request.companyMobile().isBlank()
                                 ? request.companyMobile()
                                 : intake.get(id).companyMobile()),
-                request.noOfAxles(), request.noOfWheels(), request.capacity(),
+                request.noOfAxles(), request.noOfWheels(),
+                capacities.labelFor(request.capacityId(), request.capacity()),
                 request.lengthFt(),
                 request.places() == null
                         ? List.of()

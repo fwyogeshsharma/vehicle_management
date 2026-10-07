@@ -1,6 +1,7 @@
 package com.vehiclemanagement.web;
 
 import com.vehiclemanagement.domain.Vehicle;
+import com.vehiclemanagement.service.CapacityService;
 import com.vehiclemanagement.service.VehicleService;
 import com.vehiclemanagement.web.dto.VehicleDtos;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,9 +42,11 @@ public class VehicleController {
             .and("id", "id");
 
     private final VehicleService vehicles;
+    private final CapacityService capacities;
 
-    public VehicleController(VehicleService vehicles) {
+    public VehicleController(VehicleService vehicles, CapacityService capacities) {
         this.vehicles = vehicles;
+        this.capacities = capacities;
     }
 
     @Operation(summary = "List vehicles",
@@ -96,7 +99,8 @@ public class VehicleController {
         return VehicleDtos.Detail.from(vehicles.create(
                 request.registrationNumber(), request.bodyTypeId(),
                 request.ownerCompanyId(), request.ownerUserId(),
-                request.noOfAxles(), request.noOfWheels(), request.capacity(),
+                request.noOfAxles(), request.noOfWheels(),
+                capacities.labelFor(request.capacityId(), request.capacity()),
                 request.lengthFt(), request.ownerAlsoDrives(), places(request.places())));
     }
 
@@ -119,7 +123,8 @@ public class VehicleController {
                 new VehicleService.Contacts(request.driverName(), request.driverMobile(),
                         request.driverAltMobile(), request.companyName(),
                         request.companyMobile()),
-                request.noOfAxles(), request.noOfWheels(), request.capacity(),
+                request.noOfAxles(), request.noOfWheels(),
+                capacities.labelFor(request.capacityId(), request.capacity()),
                 request.lengthFt(), places(request.places())));
     }
 
@@ -130,12 +135,14 @@ public class VehicleController {
 
     @Operation(summary = "Edit a vehicle's own attributes",
             description = "Not its owner and not its drivers. `capacity_tons` is derived by the "
-                    + "database from `capacity` and cannot be set.")
+                    + "database from `capacity` and cannot be set. `registration_number` adds or "
+                    + "corrects the plate; leaving it blank keeps the current one.")
     @PutMapping("/{id}")
     public VehicleDtos.Detail update(@PathVariable long id,
                                      @Valid @RequestBody VehicleDtos.UpdateRequest request) {
-        return VehicleDtos.Detail.from(vehicles.update(id, request.bodyTypeId(),
-                request.noOfAxles(), request.noOfWheels(), request.capacity(),
+        return VehicleDtos.Detail.from(vehicles.update(id, request.registrationNumber(),
+                request.bodyTypeId(), request.noOfAxles(), request.noOfWheels(),
+                capacities.labelFor(request.capacityId(), request.capacity()),
                 request.lengthFt(), request.notes()));
     }
 

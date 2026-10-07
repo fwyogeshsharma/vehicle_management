@@ -31,11 +31,15 @@ public class Vehicle {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Canonical spelling only — upper-case, no separators. See Normalizer.registration. */
-    @Column(name = "registration_number", nullable = false, length = 12, unique = true)
+    /**
+     * Canonical spelling only — upper-case, no separators. See Normalizer.registration.
+     * Null when the plate is not known yet (changeset 023).
+     */
+    @Column(name = "registration_number", length = 12, unique = true)
     private String registrationNumber;
 
-    @Column(name = "body_type_id", nullable = false)
+    /** Null when the body type is not known yet (changeset 023). */
+    @Column(name = "body_type_id")
     private Long bodyTypeId;
 
     @Column(name = "no_of_axles")

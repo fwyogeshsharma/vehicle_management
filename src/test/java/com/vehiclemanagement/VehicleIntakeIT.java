@@ -91,6 +91,37 @@ class VehicleIntakeIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("plate, body type, axles and wheels may all be left out — changeset 023")
+    void the_plate_and_dimensions_are_optional() {
+        ResponseEntity<JsonNode> first = post("/api/vehicles/intake", token, body(
+                "driver_name", "Gurpreet Singh", "driver_mobile", "9811008122",
+                "capacity", "16 Ton"));
+        // A second plate-less truck: uq_vehicles_reg is NULLS DISTINCT, so this is no conflict.
+        ResponseEntity<JsonNode> second = post("/api/vehicles/intake", token, body(
+                "driver_name", "Gurpreet Singh", "driver_mobile", "9811008122",
+                "capacity", "20 Ton"));
+
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode v = first.getBody();
+        assertThat(v.get("registration_number").isNull()).isTrue();
+        assertThat(v.get("body_type_id").isNull()).isTrue();
+        assertThat(v.get("no_of_axles").isNull()).isTrue();
+        assertThat(v.get("no_of_wheels").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("an optional plate, when given, is still validated")
+    void a_given_plate_is_still_checked() {
+        ResponseEntity<JsonNode> bad = post("/api/vehicles/intake", token, body(
+                "registration_number", "nonsense!!",
+                "driver_name", "Gurpreet Singh", "driver_mobile", "9811008122",
+                "capacity", "16 Ton"));
+
+        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     @DisplayName("the same driver on a second truck is reused, not duplicated")
     void an_existing_driver_is_matched_on_the_mobile() {
         intake("MH12AB1234", "Suresh Patil", "9811008121", "Kumar Roadways");
