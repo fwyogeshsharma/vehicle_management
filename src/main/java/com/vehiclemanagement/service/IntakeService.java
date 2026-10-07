@@ -239,7 +239,6 @@ public class IntakeService {
         }
         return out;
     }
-    }
 
     @Transactional
     public VehicleIntake upload(List<MultipartFile> files, String reportedPlate,
