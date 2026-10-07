@@ -35,7 +35,7 @@ spring.servlet.multipart:
 
 server:
   port: ${VM_PORT:8080}
-  # Behind Caddy/nginx (https://api.trucks.rollingradius.com) the app sees plain HTTP on :8080.
+  # Behind Caddy/nginx (https://trucks.rollingradius.com) the app sees plain HTTP on :8080.
   # Honour X-Forwarded-* so redirects and the Swagger "Servers" URL use the public https host.
   forward-headers-strategy: framework
   error:

@@ -1,6 +1,15 @@
 {$DOMAIN} {
-	reverse_proxy app:8080
-	request_body {
+	# One public hostname for both halves: the API is answered here, everything else is the UI,
+	# which still lives on Netlify and is proxied through. The browser sees a single origin, so
+	# the UI can call a relative /api and CORS never comes into it.
+	@api path /api/* /actuator/health /swagger-ui.html /swagger-ui/* /v3/api-docs /v3/api-docs/*
+	handle @api {
+		reverse_proxy app:8080
+	}
 
+	handle {
+		reverse_proxy https://{$UI_UPSTREAM} {
+			header_up Host {upstream_hostport}
+		}
 	}
 }
