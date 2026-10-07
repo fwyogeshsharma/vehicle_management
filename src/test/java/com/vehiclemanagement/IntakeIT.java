@@ -136,23 +136,23 @@ class IntakeIT extends ApiTest {
     }
 
     @Test
-    @DisplayName("a row with no photos cannot exist, whoever writes it")
-    void the_database_refuses_an_intake_with_no_photos() {
-        assertThatThrownBy(() -> jdbc.update(
-                "INSERT INTO vehicle_intake (image_keys) VALUES ('[]'::jsonb)"))
-                .hasMessageContaining("ck_intake_has_images");
-    }
-
-    @Test
-    void an_upload_with_no_photos_is_refused() {
+    void an_upload_with_no_photos_is_accepted_and_skips_the_ocr_queue() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.setBearerAuth(token);
+        LinkedMultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("reported_plate", "MH12AB1234");
         ResponseEntity<JsonNode> response = rest.exchange("/api/intake/photos", HttpMethod.POST,
-                new HttpEntity<>(new LinkedMultiValueMap<String, Object>(), headers),
-                JsonNode.class);
+                new HttpEntity<>(body, headers), JsonNode.class);
 
-        assertThat(response.getStatusCode().is2xxSuccessful()).isFalse();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        long id = idOf(response);
+        assertThat(jdbc.queryForObject(
+                "SELECT jsonb_array_length(image_keys) FROM vehicle_intake WHERE id = ?",
+                Integer.class, id)).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT processing_status FROM vehicle_intake WHERE id = ?",
+                String.class, id)).isEqualTo("DONE");
     }
 
     @Test

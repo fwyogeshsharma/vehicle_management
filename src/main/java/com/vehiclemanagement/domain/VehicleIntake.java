@@ -258,6 +258,12 @@ public class VehicleIntake {
         this.imageKeys = new ArrayList<>(imageKeys);
     }
 
+    /** For a report with no photos: nothing for OCR to read, so it skips the queue. */
+    public void markNothingToRead() {
+        this.processingStatus = ProcessingStatus.DONE;
+        this.processedAt = OffsetDateTime.now();
+    }
+
     public Long getId() { return id; }
     public List<String> getImageKeys() { return imageKeys; }
 

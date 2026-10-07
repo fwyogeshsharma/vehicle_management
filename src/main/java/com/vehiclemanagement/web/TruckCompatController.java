@@ -98,7 +98,7 @@ public class TruckCompatController {
     @PostMapping(value = "/api/trucks/report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TruckDtos.Accepted> report(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestPart("images") List<MultipartFile> images,
+            @RequestPart(name = "images", required = false) List<MultipartFile> images,
             @RequestParam(name = "phone_number", required = false) String phoneNumber,
             @RequestParam(name = "vehicle_number", required = false) String vehicleNumber,
             @RequestParam(name = "loaded_status", required = false) String loadedStatus,

@@ -51,7 +51,7 @@ public class IntakeController {
                     + "from the database within seconds.")
     @PostMapping(value = "/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<IntakeDtos.Accepted> upload(
-            @RequestPart("images") List<MultipartFile> images,
+            @RequestPart(name = "images", required = false) List<MultipartFile> images,
             @RequestParam(name = "reported_plate", required = false) String reportedPlate,
             @RequestParam(name = "reported_mobile", required = false) String reportedMobile,
             @RequestParam(name = "reported_company", required = false) String reportedCompany,

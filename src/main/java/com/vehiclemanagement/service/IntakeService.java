@@ -213,8 +213,8 @@ public class IntakeService {
         String location = report.location();
         Double latitude = report.latitude();
         Double longitude = report.longitude();
-        if (files == null || files.isEmpty()) {
-            throw new FieldValidationException("images", "At least one photo is required.");
+        if (files == null) {
+            files = List.of();
         }
         if (files.size() > config.getMaxImages()) {
             throw new FieldValidationException("images",
@@ -243,11 +243,11 @@ public class IntakeService {
             }
             keys.add(key);
         }
-        if (keys.isEmpty()) {
-            throw new FieldValidationException("images", "Every uploaded file was empty.");
-        }
 
         VehicleIntake intake = new VehicleIntake(keys);
+        if (keys.isEmpty()) {
+            intake.markNothingToRead();
+        }
         intake.setReportedPlate(Normalizer.clean(reportedPlate));
         intake.setReportedMobile(reportedDigits(report.mobile()));
         intake.setReportedCompany(Normalizer.clean(reportedCompany));
@@ -266,7 +266,8 @@ public class IntakeService {
         intake.setReportedAxleType(Normalizer.clean(report.axleType()));
 
         VehicleIntake saved = intakes.saveAndFlush(intake);
-        log.info("intake {} accepted with {} photo(s), QUEUED for OCR", saved.getId(), keys.size());
+        log.info("intake {} accepted with {} photo(s), {}", saved.getId(), keys.size(),
+                keys.isEmpty() ? "no OCR needed" : "QUEUED for OCR");
         return saved;
     }
 
