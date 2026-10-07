@@ -59,6 +59,7 @@ public class IntakeController {
             @RequestParam(name = "reported_mobile", required = false) String reportedMobile,
             @RequestParam(name = "reported_company", required = false) String reportedCompany,
             @RequestParam(name = "reported_company_mobile", required = false) String reportedCompanyMobile,
+            @RequestParam(name = "places", required = false) String places,
             @RequestParam(name = "reported_by", required = false) String reportedBy,
             @RequestParam(name = "reporter_mobile", required = false) String reporterMobile,
             @RequestParam(name = "captured_at", required = false) String capturedAt,
@@ -69,7 +70,8 @@ public class IntakeController {
         VehicleIntake saved = intake.upload(images, com.vehiclemanagement.service.IntakeService.Report
                 .of(reportedPlate, reportedMobile, reportedCompany, reportedBy, reporterMobile,
                         parseCapturedAt(capturedAt), location, latitude, longitude)
-                .withCompanyMobile(reportedCompanyMobile));
+                .withCompanyMobile(reportedCompanyMobile)
+                .withPlaces(places));
         // 202, not 201: the useful part of this request has not happened yet.
         return ResponseEntity.accepted().body(new IntakeDtos.Accepted(
                 saved.getId(), saved.getProcessingStatus(), saved.getImageKeys().size(),

@@ -177,22 +177,68 @@ public class IntakeService {
                          String location, Double latitude, Double longitude,
                          String driverName, String loadedStatus, Long bodyTypeId,
                          String materialType, Short noOfWheels, String axleType,
-                         Long capacityId, String companyMobile) {
+                         Long capacityId, String companyMobile,
+                         List<Map<String, Object>> places) {
 
         /** The nine fields the CSR-facing upload endpoint sends; the app-only ones stay null. */
         public static Report of(String plate, String mobile, String company, String reportedBy,
                                 String reporterMobile, OffsetDateTime capturedAt,
                                 String location, Double latitude, Double longitude) {
             return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
-                    location, latitude, longitude, null, null, null, null, null, null, null, null);
+                    location, latitude, longitude, null, null, null, null, null, null, null, null,
+                    null);
         }
 
         /** As {@link #of}, plus the company's own number. */
         public Report withCompanyMobile(String companyMobile) {
             return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
                     location, latitude, longitude, driverName, loadedStatus, bodyTypeId,
-                    materialType, noOfWheels, axleType, capacityId, companyMobile);
+                    materialType, noOfWheels, axleType, capacityId, companyMobile, places);
         }
+
+        /** As above, plus the routes as a JSON string: {@code [{"state_id":1,"city_id":null}]}. */
+        public Report withPlaces(String placesJson) {
+            return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
+                    location, latitude, longitude, driverName, loadedStatus, bodyTypeId,
+                    materialType, noOfWheels, axleType, capacityId, companyMobile,
+                    parsePlaces(placesJson));
+        }
+    }
+
+    /**
+     * The routes from a multipart text field, as the same {@code [{state_id, city_id|null}]} shape
+     * the CSR's correction stores in {@code edited_places}.
+     *
+     * <p><b>Never throws.</b> Like every other field on the upload, a malformed value costs us
+     * that field and not the photos: unparseable JSON yields no places, and an entry with no
+     * numeric {@code state_id} is skipped. Whether the ids name real rows is decided at
+     * completion, where the places become real {@code *_x_location} rows.
+     */
+    static List<Map<String, Object>> parsePlaces(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            for (com.fasterxml.jackson.databind.JsonNode n
+                    : new com.fasterxml.jackson.databind.ObjectMapper().readTree(json)) {
+                com.fasterxml.jackson.databind.JsonNode state =
+                        n.has("state_id") ? n.get("state_id") : n.get("stateId");
+                com.fasterxml.jackson.databind.JsonNode city =
+                        n.has("city_id") ? n.get("city_id") : n.get("cityId");
+                if (state == null || !state.canConvertToLong()) {
+                    continue;
+                }
+                Map<String, Object> place = new java.util.LinkedHashMap<>();
+                place.put("state_id", state.asLong());
+                place.put("city_id", city != null && city.canConvertToLong() ? city.asLong() : null);
+                out.add(place);
+            }
+        } catch (Exception notJson) {
+            return null;
+        }
+        return out;
+    }
     }
 
     @Transactional
@@ -272,6 +318,9 @@ public class IntakeService {
         intake.setReportedMaterialType(Normalizer.clean(report.materialType()));
         intake.setReportedNoOfWheels(wheelsInRange(report.noOfWheels()));
         intake.setReportedAxleType(Normalizer.clean(report.axleType()));
+        if (report.places() != null && !report.places().isEmpty()) {
+            intake.setEditedPlaces(report.places());
+        }
 
         VehicleIntake saved = intakes.saveAndFlush(intake);
         log.info("intake {} accepted with {} photo(s), {}", saved.getId(), keys.size(),

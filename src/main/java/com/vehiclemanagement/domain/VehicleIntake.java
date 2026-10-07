@@ -341,6 +341,8 @@ public class VehicleIntake {
     public String getEditedCompanyMobile() { return editedCompanyMobile; }
     public String getEditedDriverName() { return editedDriverName; }
     public List<Map<String, Object>> getEditedPlaces() { return editedPlaces; }
+    /** Routes supplied at upload time; later CSR corrections replace them via applyCorrection. */
+    public void setEditedPlaces(List<Map<String, Object>> v) { this.editedPlaces = List.copyOf(v); }
     public String getEditedBy() { return editedBy; }
     public OffsetDateTime getEditedAt() { return editedAt; }
 
