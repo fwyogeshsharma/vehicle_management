@@ -429,11 +429,32 @@ public class IntakeService {
      * half-typed plate mid-correction is not an error, it is someone still typing. The hard
      * validation happens at {@link #complete}, where a vehicle is actually created.
      */
+    /**
+     * The physical bounds of ck_intake_edited_* (024), checked here so a bad value gets a message
+     * on its field instead of a constraint error. 0 is "cleared" and always passes. The
+     * wheels-per-axle ratio is left to completion, like every other cross-field rule.
+     */
+    private static void checkDimensions(Short axles, Short wheels, BigDecimal lengthFt) {
+        if (axles != null && axles != 0 && (axles < 1 || axles > 12)) {
+            throw new FieldValidationException("no_of_axles", "Axles should be between 1 and 12.");
+        }
+        if (wheels != null && wheels != 0 && (wheels < 2 || wheels > 32 || wheels % 2 != 0)) {
+            throw new FieldValidationException("no_of_wheels",
+                    "Wheels should be an even number between 2 and 32.");
+        }
+        if (lengthFt != null && lengthFt.signum() != 0
+                && (lengthFt.compareTo(BigDecimal.valueOf(4)) < 0
+                    || lengthFt.compareTo(BigDecimal.valueOf(80)) > 0)) {
+            throw new FieldValidationException("length_ft", "Length should be between 4 and 80 ft.");
+        }
+    }
+
     @Transactional
     public VehicleIntake correct(long id, String actor, String plate, List<String> mobiles,
                                  String company, String driverName, Long bodyTypeId,
                                  Long capacityId, List<Map<String, Object>> places,
-                                 String companyMobile) {
+                                 String companyMobile, Short axles, Short wheels,
+                                 BigDecimal lengthFt) {
         VehicleIntake intake = get(id);
         if (intake.getReviewStatus() != ReviewStatus.PENDING) {
             throw new ApiException.Conflict("This intake was already "
@@ -456,9 +477,11 @@ public class IntakeService {
                     .distinct()
                     .toList();
         }
+        checkDimensions(axles, wheels, lengthFt);
         intake.applyCorrection(corrected(plate, true), cleanMobiles, corrected(company, false),
                 corrected(driverName, false), bodyTypeId, capacityId, places,
                 correctedMobile(companyMobile), actor);
+        intake.applyDimensions(axles, wheels, lengthFt);
         log.info("intake {} corrected by {}", id, actor);
         return intakes.saveAndFlush(intake);
     }

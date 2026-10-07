@@ -56,6 +56,8 @@ public final class IntakeDtos {
                           String companyMobile,
                           /** Single columns: the app's value at upload, then the CSR's. */
                           Long bodyTypeId, Long capacityId,
+                          /** The CSR's, or for wheels the app's when uncorrected. Null if unknown. */
+                          Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
                           short attempts, String processingError,
                           Long vehicleId, String reviewedBy, String reviewNote,
                           OffsetDateTime capturedAt, OffsetDateTime createdAt,
@@ -75,6 +77,7 @@ public final class IntakeDtos {
                     i.getEditedPlaces(), i.getEditedBy(),
                     i.plate(), i.mobiles(), i.company(), i.driverName(), i.companyMobile(),
                     i.getBodyTypeId(), i.getCapacityId(),
+                    i.noOfAxles(), i.noOfWheels(), i.lengthFt(),
                     i.getAttempts(), i.getProcessingError(),
                     i.getVehicleId(), i.getReviewedBy(), i.getReviewNote(),
                     i.getCapturedAt(), i.getCreatedAt(), i.getProcessedAt());
@@ -138,7 +141,9 @@ public final class IntakeDtos {
                                  String companyMobile,
                                  String driverName, Long bodyTypeId, Long capacityId,
                                  /** [{state_id, city_id|null}] — a null city is the whole state. */
-                                 List<Map<String, Object>> places) {
+                                 List<Map<String, Object>> places,
+                                 /** As body_type_id: null leaves it, 0 clears it. */
+                                 Short noOfAxles, Short noOfWheels, BigDecimal lengthFt) {
     }
 
     public record DiscardRequest(String reason) {

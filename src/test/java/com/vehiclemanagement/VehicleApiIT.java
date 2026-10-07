@@ -314,7 +314,7 @@ class VehicleApiIT extends ApiTest {
     }
 
     @Test
-    @DisplayName("length is optional; the other three dimensions are not")
+    @DisplayName("length, axles and wheels are optional; capacity is not")
     void length_is_optional() {
         // The column has always been nullable and ck_vehicles_length only bounds it when
         // present. Only the Java validator insisted, and a body length is the one dimension
@@ -329,18 +329,26 @@ class VehicleApiIT extends ApiTest {
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(created.getBody().get("length_ft").isNull()).isTrue();
 
-        // Axles, wheels and capacity still are required -- this loosened one field, not four.
-        for (String missing : java.util.List.of("no_of_axles", "no_of_wheels", "capacity")) {
+        // Axles and wheels became optional in changeset 023. Capacity is still required.
+        int plate = 1;
+        for (String missing : java.util.List.of("no_of_axles", "no_of_wheels")) {
             java.util.Map<String, Object> request = body(
-                    "registration_number", "MH12ZZ9091",
+                    "registration_number", "MH12ZZ909" + plate++,
                     "body_type_id", bodyTypeId,
                     "owner_user_id", driverId,
                     "owner_also_drives", true,
                     "no_of_axles", 2, "no_of_wheels", 6, "capacity", "16 Ton");
             request.remove(missing);
             assertThat(post("/api/vehicles", token, request).getStatusCode())
-                    .as("without %s", missing).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                    .as("without %s", missing).isEqualTo(HttpStatus.CREATED);
         }
+        java.util.Map<String, Object> noCapacity = body(
+                "registration_number", "MH12ZZ9099",
+                "body_type_id", bodyTypeId,
+                "owner_user_id", driverId,
+                "no_of_axles", 2, "no_of_wheels", 6);
+        assertThat(post("/api/vehicles", token, noCapacity).getStatusCode())
+                .as("without capacity").isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     @Test

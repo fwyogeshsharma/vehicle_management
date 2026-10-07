@@ -6,6 +6,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -225,6 +226,19 @@ public class VehicleIntake {
     @Column(name = "edited_places")
     private List<Map<String, Object>> editedPlaces;
 
+    /**
+     * The CSR's axles, wheels and length (changeset 024). Null means uncorrected. Wheels falls
+     * back to {@code reported_no_of_wheels}; the others have nothing to fall back to.
+     */
+    @Column(name = "edited_no_of_axles")
+    private Short editedNoOfAxles;
+
+    @Column(name = "edited_no_of_wheels")
+    private Short editedNoOfWheels;
+
+    @Column(name = "edited_length_ft")
+    private BigDecimal editedLengthFt;
+
     @Column(name = "edited_by", length = 128)
     private String editedBy;
 
@@ -424,6 +438,28 @@ public class VehicleIntake {
         this.editedBy = by;
         this.editedAt = OffsetDateTime.now();
     }
+
+    /**
+     * Record the CSR's axles, wheels and length.
+     *
+     * <p>As {@link #applyCorrection}: null leaves a value as it was, and 0 is how a cleared box
+     * arrives, so it clears. The caller has already bounds-checked anything else.
+     */
+    public void applyDimensions(Short axles, Short wheels, BigDecimal lengthFt) {
+        if (axles != null) {
+            this.editedNoOfAxles = axles == 0 ? null : axles;
+        }
+        if (wheels != null) {
+            this.editedNoOfWheels = wheels == 0 ? null : wheels;
+        }
+        if (lengthFt != null) {
+            this.editedLengthFt = lengthFt.signum() == 0 ? null : lengthFt;
+        }
+    }
+
+    public Short noOfAxles() { return editedNoOfAxles; }
+    public Short noOfWheels() { return editedNoOfWheels != null ? editedNoOfWheels : reportedNoOfWheels; }
+    public BigDecimal lengthFt() { return editedLengthFt; }
 
     public ReviewStatus getReviewStatus() { return reviewStatus; }
     public String getReviewedBy() { return reviewedBy; }

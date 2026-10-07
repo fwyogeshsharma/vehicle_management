@@ -292,6 +292,29 @@ class IntakeIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("axles, wheels and length survive a save, and 0 clears them — changeset 024")
+    void the_dimensions_are_kept_on_the_intake() {
+        long id = idOf(uploadPhotos(1));
+
+        JsonNode saved = patch("/api/intake/" + id, token,
+                body("no_of_axles", 3, "no_of_wheels", 10, "length_ft", 32)).getBody();
+        assertThat(saved.get("no_of_axles").asInt()).isEqualTo(3);
+        assertThat(saved.get("no_of_wheels").asInt()).isEqualTo(10);
+        assertThat(saved.get("length_ft").decimalValue())
+                .isEqualByComparingTo(new java.math.BigDecimal("32"));
+
+        // Left out: untouched. 0: cleared.
+        JsonNode cleared = patch("/api/intake/" + id, token, body("no_of_axles", 0)).getBody();
+        assertThat(cleared.get("no_of_axles").isNull()).isTrue();
+        assertThat(cleared.get("no_of_wheels").asInt()).isEqualTo(10);
+
+        ResponseEntity<JsonNode> odd = patch("/api/intake/" + id, token, body("no_of_wheels", 7));
+        assertThat(odd.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(odd.getBody().get("detail").get(0).get("loc").toString())
+                .isEqualTo("[\"body\",\"no_of_wheels\"]");
+    }
+
+    @Test
     @DisplayName("an emptied box clears the value rather than falling back to the read")
     void an_explicit_blank_is_a_correction_not_an_omission() {
         // "The machine read a plate but there isn't one on this truck" has to be expressible,

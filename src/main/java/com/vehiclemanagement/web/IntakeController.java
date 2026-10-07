@@ -223,7 +223,8 @@ public class IntakeController {
         return IntakeDtos.Summary.from(intake.correct(id, Principal.username(jwt),
                 request.plate(), request.mobiles(), request.company(), request.driverName(),
                 request.bodyTypeId(), request.capacityId(), request.places(),
-                request.companyMobile()));
+                request.companyMobile(), request.noOfAxles(), request.noOfWheels(),
+                request.lengthFt()));
     }
 
     @Operation(summary = "Throw an intake away",
