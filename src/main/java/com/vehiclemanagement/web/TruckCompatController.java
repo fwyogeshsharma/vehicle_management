@@ -93,8 +93,8 @@ public class TruckCompatController {
             description = "Multipart, 1–5 photos of ONE truck. Returns 202 immediately with an "
                     + "id; OCR runs in the background. Poll status_url until processing_status "
                     + "is DONE or FAILED. **Requires a bearer token** from "
-                    + "POST /api/auth/login; the report is attributed to that account, and a "
-                    + "deactivated account is refused on its next request.")
+                    + "POST /api/auth/login; the report is attributed to that account "
+                    + "(uploaded_by in the response), and a deactivated account is refused on its next request.")
     @PostMapping(value = "/api/trucks/report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TruckDtos.Accepted> report(
             @AuthenticationPrincipal Jwt jwt,
@@ -137,7 +137,8 @@ public class TruckCompatController {
                 senderMobile, parseCapturedAt(capturedAt), location, latitude, longitude,
                 driverName, loadedStatus, bodyTypeId, materialType,
                 wheels(numberOfWheels), axleType, capacityId, companyMobile, null)
-                .withPlaces(places));
+                .withPlaces(places),
+                sender == null ? null : sender.getId());
 
         return ResponseEntity.accepted().body(TruckDtos.Accepted.of(saved));
     }

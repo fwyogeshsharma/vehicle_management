@@ -1,6 +1,9 @@
 package com.vehiclemanagement.security;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
  * Reading the caller out of their bearer token.
@@ -18,6 +21,19 @@ public final class Principal {
     /** The signed-in person's id. Never null on a guarded endpoint — the filter chain saw to it. */
     public static long userId(Jwt jwt) {
         return Long.parseLong(jwt.getSubject());
+    }
+
+    /**
+     * The signed-in person's id from the current request, or null when there is none — a
+     * seeder, a bootstrap, a test calling a service directly.
+     *
+     * <p>For services that record WHO did something on every path into them, where threading a
+     * token through each overload would be the larger change. Controllers should keep taking
+     * the {@link Jwt} as a parameter.
+     */
+    public static Long currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth instanceof JwtAuthenticationToken token ? userId(token.getToken()) : null;
     }
 
     public static String username(Jwt jwt) {

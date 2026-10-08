@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.vehiclemanagement.domain.ProcessingStatus;
 import com.vehiclemanagement.domain.ReviewStatus;
 import com.vehiclemanagement.service.BodyTypeService;
+import com.vehiclemanagement.service.ImageStore;
 import com.vehiclemanagement.service.IntakeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +42,8 @@ class IntakeIT extends ApiTest {
     private IntakeService intake;
     @Autowired
     private BodyTypeService bodyTypes;
+    @Autowired
+    private ImageStore images;
 
     private String token;
     private long bodyTypeId;
@@ -379,7 +382,10 @@ class IntakeIT extends ApiTest {
     void correcting_after_the_decision_is_refused() {
         long id = idOf(uploadPhotos(1));
         ocrFinished(id, "MH12AB1234", null, null);
-        post("/api/intake/" + id + "/discard", token, body("reason", "not a truck"));
+        post("/api/intake/" + id + "/complete", token, body(
+                "registration_number", "MH12AB1234", "body_type_id", bodyTypeId,
+                "driver_name", "Suresh Patil", "driver_mobile", "9811008121",
+                "no_of_axles", 2, "no_of_wheels", 6, "capacity", "16 Ton", "length_ft", 22));
 
         ResponseEntity<JsonNode> refused = patch("/api/intake/" + id, token,
                 body("plate", "MH12AB9999"));
@@ -699,16 +705,49 @@ class IntakeIT extends ApiTest {
     }
 
     @Test
-    void discarding_is_terminal() {
-        long id = idOf(uploadPhotos(1));
+    @DisplayName("discarding deletes the row and its photos")
+    void discarding_deletes_permanently() {
+        long id = idOf(uploadPhotos(2));
+        List<String> keys = intake.get(id).getImageKeys();
+        assertThat(keys).hasSize(2).allMatch(images::exists);
 
         ResponseEntity<JsonNode> discarded = post("/api/intake/" + id + "/discard", token,
                 body("reason", "not a truck"));
 
-        assertThat(discarded.getBody().get("review_status").asText()).isEqualTo("DISCARDED");
-        assertThat(discarded.getBody().get("review_note").asText()).isEqualTo("not a truck");
+        assertThat(discarded.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(get("/api/intake/" + id, token).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM vehicle_intake WHERE id = ?",
+                Long.class, id)).isZero();
+        assertThat(keys).noneMatch(images::exists);
         assertThat(post("/api/intake/" + id + "/discard", token, body("reason", "again"))
-                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("DELETE does the same as discard")
+    void delete_is_discard() {
+        long id = idOf(uploadPhotos(1));
+
+        assertThat(delete("/api/intake/" + id, token).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(get("/api/intake/" + id, token).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("a completed intake cannot be discarded: it is the vehicle's provenance")
+    void a_completed_intake_is_kept() {
+        long id = idOf(uploadPhotos(1));
+        ocrFinished(id, "MH12AB1234", null, null);
+        post("/api/intake/" + id + "/complete", token, body(
+                "registration_number", "MH12AB1234", "body_type_id", bodyTypeId,
+                "driver_name", "Suresh Patil", "driver_mobile", "9811008121",
+                "no_of_axles", 2, "no_of_wheels", 6, "capacity", "16 Ton", "length_ft", 22));
+
+        assertThat(delete("/api/intake/" + id, token).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(get("/api/intake/" + id, token).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     // ── the schema's own guards ─────────────────────────────────────────────────

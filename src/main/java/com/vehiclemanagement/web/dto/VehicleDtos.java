@@ -40,7 +40,11 @@ public final class VehicleDtos {
                           /** The first few place names, comma separated. Null when it serves nowhere. */
                           String locations,
                           /** How many there are in total, which may exceed the names shown. */
-                          long locationCount) {
+                          long locationCount,
+                          /** users.id of who registered it; null for older or seeded rows. */
+                          Long addedBy,
+                          /** That account's current name, for display. */
+                          String addedByName) {
 
         public static Summary from(Vehicle v) {
             return from(v, null, null);
@@ -52,6 +56,12 @@ public final class VehicleDtos {
 
         public static Summary from(Vehicle v, VehicleRepository.Contact contact,
                                    VehicleRepository.LocationSummary places) {
+            return from(v, contact, places, null);
+        }
+
+        public static Summary from(Vehicle v, VehicleRepository.Contact contact,
+                                   VehicleRepository.LocationSummary places,
+                                   String addedByName) {
             return new Summary(v.getId(), v.getRegistrationNumber(), v.getBodyTypeId(),
                     v.getCapacity(), v.getCapacityTons(), v.getOwnerCompanyId(),
                     v.getOwnerUserId(), v.isCompanyOwned(), v.isActive(),
@@ -60,7 +70,8 @@ public final class VehicleDtos {
                     contact == null ? null : contact.getContactRole(),
                     v.getNoOfAxles(), v.getNoOfWheels(), v.getLengthFt(),
                     places == null ? null : places.getSummary(),
-                    places == null ? 0 : places.getTotal());
+                    places == null ? 0 : places.getTotal(),
+                    v.getAddedBy(), addedByName);
         }
     }
 
@@ -68,14 +79,22 @@ public final class VehicleDtos {
                          Short noOfWheels, String capacity, BigDecimal capacityTons,
                          BigDecimal lengthFt, Long ownerCompanyId, Long ownerUserId,
                          boolean companyOwned, boolean active, String notes,
-                         OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+                         OffsetDateTime createdAt, OffsetDateTime updatedAt,
+                         /** users.id of who registered it; null for older or seeded rows. */
+                         Long addedBy,
+                         /** That account's current name, for display. */
+                         String addedByName) {
 
         public static Detail from(Vehicle v) {
+            return from(v, null);
+        }
+
+        public static Detail from(Vehicle v, String addedByName) {
             return new Detail(v.getId(), v.getRegistrationNumber(), v.getBodyTypeId(),
                     v.getNoOfAxles(), v.getNoOfWheels(), v.getCapacity(), v.getCapacityTons(),
                     v.getLengthFt(), v.getOwnerCompanyId(), v.getOwnerUserId(),
                     v.isCompanyOwned(), v.isActive(), v.getNotes(),
-                    v.getCreatedAt(), v.getUpdatedAt());
+                    v.getCreatedAt(), v.getUpdatedAt(), v.getAddedBy(), addedByName);
         }
     }
 

@@ -92,6 +92,10 @@ public class Vehicle {
     @Column(length = 2000)
     private String notes;
 
+    /** users.id of the account that registered it. Null before changeset 026, or when seeded. */
+    @Column(name = "added_by", updatable = false)
+    private Long addedBy;
+
     @Generated(event = EventType.INSERT)
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -129,6 +133,8 @@ public class Vehicle {
     public void setActive(boolean active) { this.active = active; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    public Long getAddedBy() { return addedBy; }
+    public void setAddedBy(Long addedBy) { this.addedBy = addedBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
 

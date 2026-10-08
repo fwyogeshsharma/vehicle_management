@@ -1,6 +1,7 @@
 package com.vehiclemanagement.web;
 
 import com.vehiclemanagement.domain.Vehicle;
+import com.vehiclemanagement.repo.UserRepository;
 import com.vehiclemanagement.service.CapacityService;
 import com.vehiclemanagement.service.VehicleService;
 import com.vehiclemanagement.web.dto.VehicleDtos;
@@ -43,10 +44,13 @@ public class VehicleController {
 
     private final VehicleService vehicles;
     private final CapacityService capacities;
+    private final UserRepository users;
 
-    public VehicleController(VehicleService vehicles, CapacityService capacities) {
+    public VehicleController(VehicleService vehicles, CapacityService capacities,
+                             UserRepository users) {
         this.vehicles = vehicles;
         this.capacities = capacities;
+        this.users = users;
     }
 
     @Operation(summary = "List vehicles",
@@ -74,17 +78,19 @@ public class VehicleController {
         var found = vehicles.list(q, contact, owned, companyId, ownerUserId, bodyTypeId,
                 minTons, servingCityId, servingStateId, active,
                 PageParams.of(page, pageSize, order));
-        // Two extra queries for the whole page, not two per row.
+        // Three extra queries for the whole page, not three per row.
         var ids = found.getContent().stream().map(Vehicle::getId).toList();
         var contacts = vehicles.contactsFor(ids);
         var places = vehicles.locationsFor(ids);
+        var names = users.namesById(
+                found.getContent().stream().map(Vehicle::getAddedBy).toList());
         return PageResponse.of(found, v -> VehicleDtos.Summary.from(
-                v, contacts.get(v.getId()), places.get(v.getId())));
+                v, contacts.get(v.getId()), places.get(v.getId()), names.get(v.getAddedBy())));
     }
 
     @GetMapping("/{id}")
     public VehicleDtos.Detail get(@PathVariable long id) {
-        return VehicleDtos.Detail.from(vehicles.get(id));
+        return detail(vehicles.get(id));
     }
 
     @Operation(summary = "Register a vehicle against existing records",
@@ -96,7 +102,7 @@ public class VehicleController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public VehicleDtos.Detail create(@Valid @RequestBody VehicleDtos.CreateRequest request) {
-        return VehicleDtos.Detail.from(vehicles.create(
+        return detail(vehicles.create(
                 request.registrationNumber(), request.bodyTypeId(),
                 request.ownerCompanyId(), request.ownerUserId(),
                 request.noOfAxles(), request.noOfWheels(),
@@ -118,7 +124,7 @@ public class VehicleController {
     @PostMapping("/intake")
     @ResponseStatus(HttpStatus.CREATED)
     public VehicleDtos.Detail intake(@Valid @RequestBody VehicleDtos.IntakeRequest request) {
-        return VehicleDtos.Detail.from(vehicles.intake(
+        return detail(vehicles.intake(
                 request.registrationNumber(), request.bodyTypeId(),
                 new VehicleService.Contacts(request.driverName(), request.driverMobile(),
                         request.driverAltMobile(), request.companyName(),
@@ -126,6 +132,13 @@ public class VehicleController {
                 request.noOfAxles(), request.noOfWheels(),
                 capacities.labelFor(request.capacityId(), request.capacity()),
                 request.lengthFt(), places(request.places())));
+    }
+
+    /** The detail body, with the registering account's name looked up for display. */
+    private VehicleDtos.Detail detail(Vehicle v) {
+        String addedByName = v.getAddedBy() == null ? null
+                : users.namesById(List.of(v.getAddedBy())).get(v.getAddedBy());
+        return VehicleDtos.Detail.from(v, addedByName);
     }
 
     /** A null list and an empty one mean the same thing here: no locations given. */
@@ -140,7 +153,7 @@ public class VehicleController {
     @PutMapping("/{id}")
     public VehicleDtos.Detail update(@PathVariable long id,
                                      @Valid @RequestBody VehicleDtos.UpdateRequest request) {
-        return VehicleDtos.Detail.from(vehicles.update(id, request.registrationNumber(),
+        return detail(vehicles.update(id, request.registrationNumber(),
                 request.bodyTypeId(), request.noOfAxles(), request.noOfWheels(),
                 capacities.labelFor(request.capacityId(), request.capacity()),
                 request.lengthFt(), request.notes()));
@@ -158,7 +171,7 @@ public class VehicleController {
 
     @PostMapping("/{id}/restore")
     public VehicleDtos.Detail restore(@PathVariable long id) {
-        return VehicleDtos.Detail.from(vehicles.activate(id));
+        return detail(vehicles.activate(id));
     }
 
     @Operation(summary = "Sell a vehicle",

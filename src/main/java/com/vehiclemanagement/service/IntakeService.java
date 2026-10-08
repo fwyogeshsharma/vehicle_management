@@ -22,6 +22,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -127,6 +129,79 @@ public class IntakeService {
                     ReviewStatus.DISCARDED, pageable);
             case ALL -> intakes.findAllByOrderByCreatedAtDesc(pageable);
         };
+    }
+
+    /**
+     * As {@link #list(Tab, Pageable)}, narrowed by registration number and/or location.
+     *
+     * <p>With neither given this is exactly {@link #list(Tab, Pageable)}. Same tabs, same
+     * orderings: a search narrows the queue, it does not reorder it.
+     */
+    public Page<VehicleIntake> list(Tab tab, String plate, String location, Pageable pageable) {
+        String platePattern = platePattern(plate);
+        String locationPattern = containsPattern(location);
+        if (platePattern == null && locationPattern == null) {
+            return list(tab, pageable);
+        }
+        Tab t = tab == null ? Tab.TO_CALL : tab;
+        return intakes.search(reviewOf(t), processingOf(t), platePattern, locationPattern,
+                oldestFirst(t), pageable);
+    }
+
+    /** As {@link #count(Tab)}, under the same filters as {@link #list(Tab, String, String, Pageable)}. */
+    public long count(Tab tab, String plate, String location) {
+        String platePattern = platePattern(plate);
+        String locationPattern = containsPattern(location);
+        if (platePattern == null && locationPattern == null) {
+            return count(tab);
+        }
+        Tab t = tab == null ? Tab.TO_CALL : tab;
+        return intakes.countSearch(reviewOf(t), processingOf(t), platePattern, locationPattern);
+    }
+
+    // A tab's two coordinates, for the native search. Must agree with list(Tab, Pageable).
+
+    private static String reviewOf(Tab tab) {
+        return switch (tab) {
+            case TO_CALL, WAITING, FAILED -> ReviewStatus.PENDING.name();
+            case COMPLETED -> ReviewStatus.COMPLETED.name();
+            case DISCARDED -> ReviewStatus.DISCARDED.name();
+            case ALL -> null;
+        };
+    }
+
+    private static String processingOf(Tab tab) {
+        return switch (tab) {
+            case TO_CALL -> ProcessingStatus.DONE.name();
+            case WAITING -> ProcessingStatus.QUEUED.name() + "," + ProcessingStatus.PROCESSING.name();
+            case FAILED -> ProcessingStatus.FAILED.name();
+            case COMPLETED, DISCARDED, ALL -> null;
+        };
+    }
+
+    private static boolean oldestFirst(Tab tab) {
+        return tab == Tab.TO_CALL || tab == Tab.WAITING || tab == Tab.FAILED;
+    }
+
+    /**
+     * A plate search as a LIKE pattern over {@code [A-Z0-9]} only, so "mh 12-ab" finds MH12AB.
+     * Null when nothing searchable is left.
+     */
+    private static String platePattern(String plate) {
+        if (plate == null) {
+            return null;
+        }
+        String reduced = plate.toUpperCase().replaceAll("[^A-Z0-9]", "");
+        return reduced.isEmpty() ? null : "%" + reduced + "%";
+    }
+
+    /** A free-text "contains" pattern, with LIKE's own wildcards taken literally. */
+    private static String containsPattern(String text) {
+        String clean = Normalizer.clean(text);
+        if (clean == null) {
+            return null;
+        }
+        return "%" + clean.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
     }
 
     public long count(Tab tab) {
@@ -257,6 +332,17 @@ public class IntakeService {
 
     @Transactional
     public VehicleIntake upload(List<MultipartFile> files, Report report) {
+        return upload(files, report, null);
+    }
+
+    /**
+     * As {@link #upload(List, Report)}, recording which account sent it.
+     *
+     * <p>{@code uploadedBy} is a separate argument rather than a {@link Report} field because it
+     * is not part of the report: it comes from the bearer token, never from the body.
+     */
+    @Transactional
+    public VehicleIntake upload(List<MultipartFile> files, Report report, Long uploadedBy) {
         String reportedPlate = report.plate();
         String reportedCompany = report.company();
         String reportedBy = report.reportedBy();
@@ -306,6 +392,7 @@ public class IntakeService {
         intake.setReportedCompanyMobile(reportedDigits(report.companyMobile()));
         intake.setReportedBy(Normalizer.clean(reportedBy));
         intake.setReporterMobile(Normalizer.optionalMobile(reporterMobile, "reporter_mobile"));
+        intake.setUploadedBy(uploadedBy);
         intake.setCapturedAt(capturedAt == null ? OffsetDateTime.now() : capturedAt);
         intake.setLocation(Normalizer.clean(location));
         intake.setLatitude(latitude);
@@ -602,12 +689,56 @@ public class IntakeService {
         return intakes.saveAndFlush(intake);
     }
 
+    /**
+     * Throw an intake away: the row <b>and its photos</b>, permanently.
+     *
+     * <p>Discarding used to mark the row DISCARDED and keep everything. It now deletes, because
+     * a discarded report is one nobody wants back (not a truck, unreadable, or a duplicate) and
+     * keeping its photos only cost storage. The log line below is the only trace left.
+     *
+     * <p>Only an unreviewed row: a COMPLETED one is the provenance of a vehicle, and stays.
+     *
+     * <p><b>The photos go after the commit, not before.</b> Deleted first, a rollback would
+     * leave a live row whose photos are gone. Deleted after, a failure leaves orphan objects,
+     * which cost storage and nothing else: the same trade {@link #upload} makes in reverse.
+     *
+     * <p>Safe against the OCR worker: its writes are {@code UPDATE ... WHERE id = ?}, so a row
+     * deleted while it reads simply updates nothing.
+     */
     @Transactional
-    public VehicleIntake discard(long id, String actor, String reason) {
+    public void discard(long id, String actor, String reason) {
         VehicleIntake intake = get(id);
         requireUnreviewed(intake, "discard");
-        intake.discard(actor, Normalizer.clean(reason));
-        return intakes.saveAndFlush(intake);
+        List<String> keys = List.copyOf(intake.getImageKeys());
+        intakes.delete(intake);
+        intakes.flush();
+        String why = Normalizer.clean(reason);
+        log.info("intake {} DELETED by {} with {} photo(s){}", id, actor, keys.size(),
+                why == null ? "" : ": " + why);
+        afterCommit(() -> {
+            for (String key : keys) {
+                try {
+                    images.delete(key);
+                } catch (RuntimeException e) {
+                    log.warn("intake {}: photo {} could not be deleted and is now orphaned",
+                            id, key, e);
+                }
+            }
+        });
+    }
+
+    /** Run once the surrounding transaction commits; immediately when there is none. */
+    private static void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     /**

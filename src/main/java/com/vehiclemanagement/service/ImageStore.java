@@ -50,4 +50,10 @@ public interface ImageStore {
     byte[] get(String key);
 
     boolean exists(String key);
+
+    /**
+     * Remove one photo. A key that is already gone is not an error: the outcome asked for is
+     * "this object does not exist", and it doesn't.
+     */
+    void delete(String key);
 }

@@ -9,9 +9,28 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+
+    /**
+     * Display names for a set of user ids, in one query. For list endpoints that show who did
+     * something on every row: looking each one up would be the N+1 this codebase avoids.
+     * Nulls are ignored; an id with no row is simply absent from the map.
+     */
+    default Map<Long, String> namesById(Collection<Long> ids) {
+        Set<Long> wanted = ids.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+        if (wanted.isEmpty()) {
+            return Map.of();
+        }
+        return findAllById(wanted).stream()
+                .collect(Collectors.toMap(User::getId, User::getName));
+    }
 
     /**
      * How many people can actually administer the system right now.

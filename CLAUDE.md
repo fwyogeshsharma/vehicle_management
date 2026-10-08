@@ -135,6 +135,11 @@ services.
 - **`IntakeService.complete` delegates to `VehicleService.intake`.** Never create a vehicle here
   directly: that one path already knows the employment rule, the driver assignment order and
   where preferred locations belong.
+- **Discarding deletes, permanently** — the row, and its photos from the image store once the
+  transaction commits (`IntakeService.discard`; also `DELETE /api/intake/{id}`). Only an
+  unreviewed row: a COMPLETED one is a vehicle's provenance and is refused. The log line is the
+  only trace. `DISCARDED` stays in the schema for rows discarded before this change; nothing
+  writes it any more.
 - **There is no automatic retry, anywhere.** One failed attempt marks the row `FAILED` and no
   worker picks it up again; `IntakeService.retry` — a human pressing **Read again** — is the only
   route back into the queue, and it does not reset `attempts`. Two things are deliberately not

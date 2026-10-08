@@ -1,6 +1,7 @@
 package com.vehiclemanagement.web;
 
 import com.vehiclemanagement.domain.VehicleIntake;
+import com.vehiclemanagement.repo.UserRepository;
 import com.vehiclemanagement.security.Principal;
 import com.vehiclemanagement.service.CapacityService;
 import com.vehiclemanagement.service.IntakeService;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,10 +41,13 @@ public class IntakeController {
 
     private final IntakeService intake;
     private final CapacityService capacities;
+    private final UserRepository users;
 
-    public IntakeController(IntakeService intake, CapacityService capacities) {
+    public IntakeController(IntakeService intake, CapacityService capacities,
+                            UserRepository users) {
         this.intake = intake;
         this.capacities = capacities;
+        this.users = users;
     }
 
     // ── the field app ───────────────────────────────────────────────────────────
@@ -54,6 +59,7 @@ public class IntakeController {
                     + "from the database within seconds.")
     @PostMapping(value = "/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<IntakeDtos.Accepted> upload(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestPart(name = "images", required = false) List<MultipartFile> images,
             @RequestParam(name = "reported_plate", required = false) String reportedPlate,
             @RequestParam(name = "reported_mobile", required = false) String reportedMobile,
@@ -71,7 +77,8 @@ public class IntakeController {
                 .of(reportedPlate, reportedMobile, reportedCompany, reportedBy, reporterMobile,
                         parseCapturedAt(capturedAt), location, latitude, longitude)
                 .withCompanyMobile(reportedCompanyMobile)
-                .withPlaces(places));
+                .withPlaces(places),
+                Principal.userId(jwt));
         // 202, not 201: the useful part of this request has not happened yet.
         return ResponseEntity.accepted().body(new IntakeDtos.Accepted(
                 saved.getId(), saved.getProcessingStatus(), saved.getImageKeys().size(),
@@ -115,25 +122,40 @@ public class IntakeController {
      * {@code Sort} on one against <i>entity property</i> names. {@link Sorts} yields <i>column</i>
      * names, which is correct for the native {@code search} queries elsewhere and a 500 here.
      */
+    @Operation(summary = "The worklist, one tab at a time",
+            description = "`registration_number` matches the CSR's, the reporter's and OCR's "
+                    + "plates and, once completed, the vehicle's — partial, ignoring case, "
+                    + "spaces and dashes. `location` matches the reported address and the "
+                    + "state/city names the CSR noted, partial and ignoring case. Both narrow "
+                    + "the tab without changing its order.")
     @GetMapping
     public PageResponse<IntakeDtos.Summary> list(
             @RequestParam(name = "tab", required = false) IntakeService.Tab tab,
+            @RequestParam(name = "registration_number", required = false) String registrationNumber,
+            @RequestParam(name = "location", required = false) String location,
             @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "page_size", required = false) Integer pageSize) {
-        return PageResponse.of(
-                intake.list(tab, PageParams.of(page, pageSize, Sort.unsorted())),
-                IntakeDtos.Summary::from);
+        var found = intake.list(tab, registrationNumber, location,
+                PageParams.of(page, pageSize, Sort.unsorted()));
+        // One query for every uploader on the page, not one per row.
+        var names = users.namesById(
+                found.getContent().stream().map(VehicleIntake::getUploadedBy).toList());
+        return PageResponse.of(found,
+                i -> IntakeDtos.Summary.from(i, names.get(i.getUploadedBy())));
     }
 
+    /** Tab badges. Takes the list's filters, so a badge counts what its tab would show. */
     @GetMapping("/counts")
-    public IntakeDtos.Counts counts() {
+    public IntakeDtos.Counts counts(
+            @RequestParam(name = "registration_number", required = false) String registrationNumber,
+            @RequestParam(name = "location", required = false) String location) {
         return new IntakeDtos.Counts(
-                intake.count(IntakeService.Tab.TO_CALL),
-                intake.count(IntakeService.Tab.WAITING),
-                intake.count(IntakeService.Tab.FAILED),
-                intake.count(IntakeService.Tab.COMPLETED),
-                intake.count(IntakeService.Tab.DISCARDED),
-                intake.count(IntakeService.Tab.ALL));
+                intake.count(IntakeService.Tab.TO_CALL, registrationNumber, location),
+                intake.count(IntakeService.Tab.WAITING, registrationNumber, location),
+                intake.count(IntakeService.Tab.FAILED, registrationNumber, location),
+                intake.count(IntakeService.Tab.COMPLETED, registrationNumber, location),
+                intake.count(IntakeService.Tab.DISCARDED, registrationNumber, location),
+                intake.count(IntakeService.Tab.ALL, registrationNumber, location));
     }
 
     @Operation(summary = "What is already on file under this name and these numbers",
@@ -152,7 +174,9 @@ public class IntakeController {
 
     @GetMapping("/{id}")
     public IntakeDtos.Detail get(@PathVariable long id) {
-        return IntakeDtos.Detail.from(intake.get(id));
+        VehicleIntake row = intake.get(id);
+        return IntakeDtos.Detail.from(row, row.getUploadedBy() == null ? null
+                : users.namesById(List.of(row.getUploadedBy())).get(row.getUploadedBy()));
     }
 
     @Operation(summary = "One uploaded photo",
@@ -229,14 +253,27 @@ public class IntakeController {
                 request.lengthFt()));
     }
 
-    @Operation(summary = "Throw an intake away",
-            description = "Unreadable, not a truck, or already on file. Terminal.")
+    @Operation(summary = "Throw an intake away, permanently",
+            description = "Unreadable, not a truck, or already on file. **Deletes the row and "
+                    + "its photos**: there is no undo, and the id answers 404 afterwards. Only "
+                    + "an unreviewed intake; a completed one is a vehicle's provenance and is "
+                    + "refused with 409. DELETE /api/intake/{id} does the same; this POST form "
+                    + "remains for existing callers and accepts an optional reason, which is "
+                    + "logged.")
     @PostMapping("/{id}/discard")
-    public IntakeDtos.Summary discard(@AuthenticationPrincipal Jwt jwt,
-                                      @PathVariable long id,
-                                      @RequestBody(required = false) IntakeDtos.DiscardRequest body) {
-        return IntakeDtos.Summary.from(
-                intake.discard(id, Principal.username(jwt), body == null ? null : body.reason()));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void discard(@AuthenticationPrincipal Jwt jwt,
+                        @PathVariable long id,
+                        @RequestBody(required = false) IntakeDtos.DiscardRequest body) {
+        intake.discard(id, Principal.username(jwt), body == null ? null : body.reason());
+    }
+
+    @Operation(summary = "Delete an intake and its photos",
+            description = "The same as POST /api/intake/{id}/discard, without a reason.")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {
+        intake.discard(id, Principal.username(jwt), null);
     }
 
     @Operation(summary = "Read it again",

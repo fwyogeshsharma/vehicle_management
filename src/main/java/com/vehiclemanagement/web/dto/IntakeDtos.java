@@ -37,7 +37,12 @@ public final class IntakeDtos {
                           ProcessingStatus processingStatus, ReviewStatus reviewStatus,
                           int photoCount,
                           String reportedPlate, String reportedMobile, String reportedCompany,
-                          String reportedBy, String reportedDriverName,
+                          String reportedBy,
+                          /** users.id of the uploading account; null before changeset 025. */
+                          Long uploadedBy,
+                          /** That account's current name, for display. */
+                          String uploadedByName,
+                          String reportedDriverName,
                           String reportedCompanyMobile,
                           String location,
                           String ocrPlate, List<String> ocrMobiles, String ocrCompany,
@@ -64,10 +69,15 @@ public final class IntakeDtos {
                           OffsetDateTime processedAt) {
 
         public static Summary from(VehicleIntake i) {
+            return from(i, null);
+        }
+
+        public static Summary from(VehicleIntake i, String uploadedByName) {
             return new Summary(i.getId(),
                     i.getProcessingStatus(), i.getReviewStatus(), i.getImageKeys().size(),
                     i.getReportedPlate(), i.getReportedMobile(), i.getReportedCompany(),
-                    i.getReportedBy(), i.getReportedDriverName(),
+                    i.getReportedBy(), i.getUploadedBy(), uploadedByName,
+                    i.getReportedDriverName(),
                     i.getReportedCompanyMobile(),
                     i.getLocation(),
                     i.getOcrPlate(), i.getOcrMobiles(), i.getOcrCompany(),
@@ -88,7 +98,11 @@ public final class IntakeDtos {
     public record Detail(Summary summary, Map<String, Object> ocrRaw) {
 
         public static Detail from(VehicleIntake i) {
-            return new Detail(Summary.from(i), i.getOcrRaw());
+            return from(i, null);
+        }
+
+        public static Detail from(VehicleIntake i, String uploadedByName) {
+            return new Detail(Summary.from(i, uploadedByName), i.getOcrRaw());
         }
     }
 

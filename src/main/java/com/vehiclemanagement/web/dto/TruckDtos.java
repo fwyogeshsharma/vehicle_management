@@ -48,13 +48,16 @@ public final class TruckDtos {
                            @JsonProperty("review_status") String reviewStatus,
                            @JsonProperty("images_accepted") int imagesAccepted,
                            @JsonProperty("status_url") String statusUrl,
-                           String message) {
+                           String message,
+                           /** Not FreightDesk's: the users.id the token belonged to. */
+                           @JsonProperty("uploaded_by") Long uploadedBy) {
 
         public static Accepted of(VehicleIntake i) {
             return new Accepted(i.getId(), i.getProcessingStatus(),
                     review(i.getReviewStatus()), i.getImageKeys().size(),
                     "/api/trucks/" + i.getId(),
-                    "Report accepted; OCR is running in the background.");
+                    "Report accepted; OCR is running in the background.",
+                    i.getUploadedBy());
         }
     }
 
@@ -115,7 +118,12 @@ public final class TruckDtos {
                          * no way to reach the photos it just uploaded, and an extra key is
                          * ignored by any client that is not looking for it.
                          */
-                        @JsonProperty("image_urls") List<String> imageUrls) {
+                        @JsonProperty("image_urls") List<String> imageUrls,
+                        /**
+                         * Not FreightDesk's: the users.id of the account whose token uploaded
+                         * this. Null for reports from before it was recorded.
+                         */
+                        @JsonProperty("uploaded_by") Long uploadedBy) {
 
         /** {@code bodyTypeName} is the master name for the intake's body type, null if none. */
         public static Truck of(VehicleIntake i, String bodyTypeName) {
@@ -155,7 +163,7 @@ public final class TruckDtos {
                     i.getReportedMobile(),
                     i.getOcrMobiles().isEmpty() ? null : i.getOcrMobiles().get(0),
                     i.getReportedBy(),
-                    null,               // reported_by_user_id: no contributor accounts here
+                    i.getUploadedBy(),  // reported_by_user_id: FreightDesk's name for the same fact
                     i.getReporterMobile(),
                     verification(i),
                     review(i.getReviewStatus()),
@@ -171,7 +179,8 @@ public final class TruckDtos {
                     raw.get("body_texts"),
                     null,               // image_path: keys only, never a server path
                     i.getCreatedAt(),
-                    urls);
+                    urls,
+                    i.getUploadedBy());
         }
 
         /** The CSR's correction wins, then the reporter's claim, then what OCR read. */

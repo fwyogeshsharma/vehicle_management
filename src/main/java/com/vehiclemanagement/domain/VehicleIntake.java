@@ -81,6 +81,14 @@ public class VehicleIntake {
     @Column(name = "reporter_mobile", length = 10)
     private String reporterMobile;
 
+    /**
+     * The account that uploaded this, from its bearer token -- a fact, unlike the claims around
+     * it. {@code reported_by} is that account's name as a display string; this is the key.
+     * Null for rows uploaded before changeset 025.
+     */
+    @Column(name = "uploaded_by")
+    private Long uploadedBy;
+
     // The six the mobile app has always sent. Free text, every one of them: the app owns its
     // pick lists and we do not get to reject a photo because its spelling of a body type
     // disagrees with ours. The CSR turns these into the typed `edited_` fields on the call.
@@ -301,6 +309,8 @@ public class VehicleIntake {
     public void setReportedBy(String v) { this.reportedBy = v; }
     public String getReporterMobile() { return reporterMobile; }
     public void setReporterMobile(String v) { this.reporterMobile = v; }
+    public Long getUploadedBy() { return uploadedBy; }
+    public void setUploadedBy(Long v) { this.uploadedBy = v; }
     public String getReportedDriverName() { return reportedDriverName; }
     public void setReportedDriverName(String v) { this.reportedDriverName = v; }
     public String getReportedLoadedStatus() { return reportedLoadedStatus; }

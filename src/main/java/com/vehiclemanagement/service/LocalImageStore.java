@@ -52,6 +52,25 @@ public class LocalImageStore implements ImageStore {
         return Files.isRegularFile(resolve(key));
     }
 
+    @Override
+    public void delete(String key) {
+        Path target = resolve(key);
+        try {
+            Files.deleteIfExists(target);
+            // The per-upload folder is empty once its last photo goes; leave no husk behind.
+            Path folder = target.getParent();
+            if (folder != null && !folder.equals(root) && Files.isDirectory(folder)) {
+                try (var left = Files.list(folder)) {
+                    if (left.findAny().isEmpty()) {
+                        Files.deleteIfExists(folder);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new ApiException(500, "Could not delete the photo.");
+        }
+    }
+
     /**
      * Resolve a key under the storage root, refusing anything that climbs out of it.
      *

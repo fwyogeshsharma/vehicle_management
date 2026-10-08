@@ -5,6 +5,7 @@ import com.vehiclemanagement.exception.ApiException;
 import com.vehiclemanagement.exception.ConstraintErrors;
 import com.vehiclemanagement.exception.FieldValidationException;
 import com.vehiclemanagement.repo.*;
+import com.vehiclemanagement.security.Principal;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -118,6 +119,9 @@ public class VehicleService {
 
         return ConstraintErrors.translating(() -> {
             Vehicle v = new Vehicle(reg, bodyTypeId);
+            // Every creation path ends here -- the form, the desk intake and a completed photo
+            // intake -- so this is the one place that records who registered the truck.
+            v.setAddedBy(Principal.currentUserId());
             v.assignOwner(ownerCompanyId, ownerUserId);
             v.setNoOfAxles(axles);
             v.setNoOfWheels(wheels);
