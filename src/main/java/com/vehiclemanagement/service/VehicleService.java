@@ -342,6 +342,43 @@ public class VehicleService {
         return v;
     }
 
+    /** As above, with a free-text note on the vehicle. Blank or null leaves it without one. */
+    @Transactional
+    public Vehicle create(String registrationNumber, Long bodyTypeId,
+                          Long ownerCompanyId, Long ownerUserId,
+                          Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                          boolean ownerAlsoDrives, List<CityRef> places, String notes) {
+        return annotate(create(registrationNumber, bodyTypeId, ownerCompanyId, ownerUserId,
+                axles, wheels, capacity, lengthFt, ownerAlsoDrives, places), notes);
+    }
+
+    /** As {@link #intake}, with a free-text note on the vehicle. */
+    @Transactional
+    public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
+                          Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                          List<CityRef> places, String notes) {
+        return annotate(intake(registrationNumber, bodyTypeId, contacts,
+                axles, wheels, capacity, lengthFt, places), notes);
+    }
+
+    /** Same transaction as the create, so a refused note leaves no vehicle behind. */
+    private Vehicle annotate(Vehicle v, String notes) {
+        String clean = Normalizer.clean(notes);
+        if (clean == null) {
+            return v;
+        }
+        requireNotesLength(clean);
+        v.setNotes(clean);
+        return ConstraintErrors.translating(() -> vehicles.saveAndFlush(v));
+    }
+
+    /** vehicles.notes is VARCHAR(2000); past that the database answers with a bare 500. */
+    static void requireNotesLength(String notes) {
+        if (notes != null && notes.length() > 2000) {
+            throw new FieldValidationException("notes", "Notes can be at most 2000 characters.");
+        }
+    }
+
     /**
      * Move a vehicle to exactly one new owner.
      *
@@ -503,7 +540,7 @@ public class VehicleService {
     @Transactional
     public Vehicle update(long vehicleId, String registrationNumber, Long bodyTypeId,
                           Short axles, Short wheels, String capacity, BigDecimal lengthFt,
-                          String notes) {
+                          String notes, Boolean verified) {
         Vehicle v = get(vehicleId);
         String reg = Normalizer.optionalRegistration(registrationNumber, "registration_number");
         if (reg != null && vehicles.existsByRegistrationNumberAndIdNot(reg, vehicleId)) {
@@ -521,7 +558,11 @@ public class VehicleService {
         // two cannot end up disagreeing. Do not add a Java-side mirror.
         v.setCapacity(Normalizer.clean(capacity));
         v.setLengthFt(lengthFt);
+        requireNotesLength(Normalizer.clean(notes));
         v.setNotes(Normalizer.clean(notes));
+        if (verified != null) {
+            v.setVerified(verified);
+        }
         return ConstraintErrors.translating(() -> vehicles.saveAndFlush(v));
     }
 

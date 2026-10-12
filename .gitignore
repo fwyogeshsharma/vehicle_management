@@ -1,0 +1,18 @@
+target/
+*.class
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# local overrides — VM_DATABASE_PASSWORD and friends live here, never in the repo
+.env
+application-local.yml
+
+# photo uploads written by a locally running server
+uploads/

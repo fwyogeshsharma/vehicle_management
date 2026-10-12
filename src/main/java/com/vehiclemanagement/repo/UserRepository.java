@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,7 +27,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default Map<Long, String> namesById(Collection<Long> ids) {
         Set<Long> wanted = ids.stream().filter(Objects::nonNull).collect(Collectors.toSet());
         if (wanted.isEmpty()) {
-            return Map.of();
+            // Not Map.of(): callers look up a null id for rows nobody is recorded against, and
+            // Map.of().get(null) throws -- a 500 on any page where every row predates the column.
+            return Collections.emptyMap();
         }
         return findAllById(wanted).stream()
                 .collect(Collectors.toMap(User::getId, User::getName));

@@ -234,7 +234,8 @@ public class IntakeController {
                 request.lengthFt(),
                 request.places() == null
                         ? List.of()
-                        : request.places().stream().map(VehicleDtos.Place::toRef).toList()));
+                        : request.places().stream().map(VehicleDtos.Place::toRef).toList(),
+                request.verified(), request.notes()));
     }
 
     @Operation(summary = "Correct what the photo says",
@@ -250,7 +251,7 @@ public class IntakeController {
                 request.plate(), request.mobiles(), request.company(), request.driverName(),
                 request.bodyTypeId(), request.capacityId(), request.places(),
                 request.companyMobile(), request.noOfAxles(), request.noOfWheels(),
-                request.lengthFt()));
+                request.lengthFt(), request.verified(), request.notes()));
     }
 
     @Operation(summary = "Throw an intake away, permanently",

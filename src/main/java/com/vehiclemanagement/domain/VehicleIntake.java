@@ -247,6 +247,17 @@ public class VehicleIntake {
     @Column(name = "edited_length_ft")
     private BigDecimal editedLengthFt;
 
+    /**
+     * The CSR has confirmed the details on the call (changeset 027). Copied onto the vehicle at
+     * completion. This service's column; the OCR worker never touches it.
+     */
+    @Column(name = "is_verified", nullable = false)
+    private boolean verified;
+
+    /** The CSR's remarks (changeset 028). Copied onto vehicles.notes at completion. */
+    @Column(length = 2000)
+    private String notes;
+
     @Column(name = "edited_by", length = 128)
     private String editedBy;
 
@@ -468,6 +479,11 @@ public class VehicleIntake {
             this.editedLengthFt = lengthFt.signum() == 0 ? null : lengthFt;
         }
     }
+
+    public boolean isVerified() { return verified; }
+    public void setVerified(boolean verified) { this.verified = verified; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public Short noOfAxles() { return editedNoOfAxles; }
     public Short noOfWheels() { return editedNoOfWheels != null ? editedNoOfWheels : reportedNoOfWheels; }

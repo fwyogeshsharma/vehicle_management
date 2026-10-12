@@ -845,4 +845,124 @@ class IntakeIT extends ApiTest {
         assertThat(get("/api/intake?tab=TO_CALL", null).getStatusCode().value())
                 .isIn(401, 403);
     }
+
+    // ── verified tick and notes ─────────────────────────────────────────────────
+
+    /** The body every completion here uses, plus whatever the test adds. */
+    private Map<String, Object> completion(Object... extra) {
+        Map<String, Object> b = new java.util.HashMap<>(body(
+                "registration_number", "MH12AB1234", "body_type_id", bodyTypeId,
+                "driver_name", "Suresh Patil", "driver_mobile", "9811008121",
+                "no_of_axles", 2, "no_of_wheels", 6, "capacity", "16 Ton", "length_ft", 22));
+        b.putAll(body(extra));
+        return b;
+    }
+
+    @Test
+    @DisplayName("the tick and the notes are saved with a correction and survive a re-read")
+    void the_tick_and_notes_survive_closing_the_form() {
+        long id = idOf(uploadPhotos(1));
+        assertThat(get("/api/intake/" + id, token).getBody().get("summary").get("verified").asBoolean()).isFalse();
+
+        JsonNode saved = patch("/api/intake/" + id, token,
+                body("verified", true, "notes", "  call after 6pm  ")).getBody();
+        assertThat(saved.get("verified").asBoolean()).isTrue();
+        assertThat(saved.get("notes").asText()).isEqualTo("call after 6pm");
+
+        JsonNode reread = get("/api/intake/" + id, token).getBody().get("summary");
+        assertThat(reread.get("verified").asBoolean()).isTrue();
+        assertThat(reread.get("notes").asText()).isEqualTo("call after 6pm");
+    }
+
+    @Test
+    @DisplayName("a correction that omits the tick and notes leaves them; \"\" clears the notes")
+    void omitted_leaves_and_blank_clears() {
+        long id = idOf(uploadPhotos(1));
+        patch("/api/intake/" + id, token, body("verified", true, "notes", "second truck"));
+
+        JsonNode untouched = patch("/api/intake/" + id, token, body("plate", "MH12AB1234"))
+                .getBody();
+        assertThat(untouched.get("verified").asBoolean()).isTrue();
+        assertThat(untouched.get("notes").asText()).isEqualTo("second truck");
+
+        JsonNode cleared = patch("/api/intake/" + id, token,
+                body("verified", false, "notes", "")).getBody();
+        assertThat(cleared.get("verified").asBoolean()).isFalse();
+        assertThat(cleared.get("notes").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("over-long notes on a correction are a 422 on the field, not a 500")
+    void over_long_notes_on_a_correction_are_refused() {
+        long id = idOf(uploadPhotos(1));
+
+        ResponseEntity<JsonNode> refused = patch("/api/intake/" + id, token,
+                body("notes", "x".repeat(2001)));
+
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getBody().toString()).contains("notes");
+        assertThat(patch("/api/intake/" + id, token, body("notes", "x".repeat(2000)))
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("completing without the tick or notes carries over what was saved on the row")
+    void completion_falls_back_to_the_saved_row() {
+        long id = idOf(uploadPhotos(1));
+        patch("/api/intake/" + id, token, body("verified", true, "notes", "owner prefers WhatsApp"));
+
+        ResponseEntity<JsonNode> completed = post("/api/intake/" + id + "/complete", token,
+                completion());
+
+        assertThat(completed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        long vehicleId = completed.getBody().get("vehicle_id").asLong();
+        JsonNode vehicle = get("/api/vehicles/" + vehicleId, token).getBody();
+        assertThat(vehicle.get("verified").asBoolean()).isTrue();
+        assertThat(vehicle.get("notes").asText()).isEqualTo("owner prefers WhatsApp");
+    }
+
+    @Test
+    @DisplayName("the completion form's tick and notes win over the saved row")
+    void the_form_wins_over_the_saved_row() {
+        long id = idOf(uploadPhotos(1));
+        patch("/api/intake/" + id, token, body("verified", true, "notes", "old remark"));
+
+        JsonNode completed = post("/api/intake/" + id + "/complete", token,
+                completion("verified", false, "notes", "new remark")).getBody();
+
+        assertThat(completed.get("verified").asBoolean()).isFalse();
+        assertThat(completed.get("notes").asText()).isEqualTo("new remark");
+        JsonNode vehicle = get("/api/vehicles/" + completed.get("vehicle_id").asLong(), token)
+                .getBody();
+        assertThat(vehicle.get("verified").asBoolean()).isFalse();
+        assertThat(vehicle.get("notes").asText()).isEqualTo("new remark");
+    }
+
+    @Test
+    @DisplayName("an unverified intake completes into an unverified vehicle with no notes")
+    void nothing_ticked_means_nothing_carried() {
+        long id = idOf(uploadPhotos(1));
+
+        JsonNode completed = post("/api/intake/" + id + "/complete", token, completion())
+                .getBody();
+
+        JsonNode vehicle = get("/api/vehicles/" + completed.get("vehicle_id").asLong(), token)
+                .getBody();
+        assertThat(vehicle.get("verified").asBoolean()).isFalse();
+        assertThat(vehicle.get("notes").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("over-long notes at completion leave no vehicle behind and the row pending")
+    void over_long_notes_at_completion_roll_back() {
+        long id = idOf(uploadPhotos(1));
+
+        ResponseEntity<JsonNode> refused = post("/api/intake/" + id + "/complete", token,
+                completion("notes", "x".repeat(2001)));
+
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM vehicles", Long.class)).isZero();
+        assertThat(get("/api/intake/" + id, token).getBody().get("summary").get("review_status").asText())
+                .isEqualTo("PENDING");
+    }
 }

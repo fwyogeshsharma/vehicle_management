@@ -589,7 +589,7 @@ public class IntakeService {
                                  String company, String driverName, Long bodyTypeId,
                                  Long capacityId, List<Map<String, Object>> places,
                                  String companyMobile, Short axles, Short wheels,
-                                 BigDecimal lengthFt) {
+                                 BigDecimal lengthFt, Boolean verified, String notes) {
         VehicleIntake intake = get(id);
         if (intake.getReviewStatus() != ReviewStatus.PENDING) {
             throw new ApiException.Conflict("This intake was already "
@@ -617,6 +617,14 @@ public class IntakeService {
                 corrected(driverName, false), bodyTypeId, capacityId, places,
                 correctedMobile(companyMobile), actor);
         intake.applyDimensions(axles, wheels, lengthFt);
+        if (verified != null) {
+            intake.setVerified(verified);
+        }
+        if (notes != null) {
+            String clean = Normalizer.clean(notes);
+            VehicleService.requireNotesLength(clean);
+            intake.setNotes(clean);
+        }
         log.info("intake {} corrected by {}", id, actor);
         return intakes.saveAndFlush(intake);
     }
@@ -665,7 +673,8 @@ public class IntakeService {
     public VehicleIntake complete(long id, String actor, String registrationNumber,
                                   Long bodyTypeId, VehicleService.Contacts contacts,
                                   Short axles, Short wheels, String capacity,
-                                  BigDecimal lengthFt, List<VehicleService.CityRef> places) {
+                                  BigDecimal lengthFt, List<VehicleService.CityRef> places,
+                                  Boolean verified, String notes) {
         VehicleIntake intake = get(id);
         requireUnreviewed(intake, "complete");
 
@@ -682,8 +691,21 @@ public class IntakeService {
             });
         }
 
+        // The form's notes win; without any, whatever was saved on the row while working it.
         Vehicle vehicle = vehicleService.intake(canonical, bodyTypeId, contacts,
-                axles, wheels, capacity, lengthFt, places == null ? List.of() : places);
+                axles, wheels, capacity, lengthFt, places == null ? List.of() : places,
+                notes != null ? notes : intake.getNotes());
+        if (notes != null) {
+            intake.setNotes(Normalizer.clean(notes));
+        }
+        // The form's tick wins; without one, whatever was saved on the row while working it.
+        if (verified != null) {
+            intake.setVerified(verified);
+        }
+        if (intake.isVerified()) {
+            vehicle.setVerified(true);
+            vehicles.saveAndFlush(vehicle);
+        }
         intake.complete(vehicle.getId(), actor);
         log.info("intake {} COMPLETED as vehicle {} by {}", id, vehicle.getId(), actor);
         return intakes.saveAndFlush(intake);

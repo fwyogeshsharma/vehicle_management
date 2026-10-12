@@ -107,7 +107,8 @@ public class VehicleController {
                 request.ownerCompanyId(), request.ownerUserId(),
                 request.noOfAxles(), request.noOfWheels(),
                 capacities.labelFor(request.capacityId(), request.capacity()),
-                request.lengthFt(), request.ownerAlsoDrives(), places(request.places())));
+                request.lengthFt(), request.ownerAlsoDrives(), places(request.places()),
+                request.notes()));
     }
 
     @Operation(summary = "Register a vehicle, creating its driver and company as needed",
@@ -131,7 +132,7 @@ public class VehicleController {
                         request.companyMobile()),
                 request.noOfAxles(), request.noOfWheels(),
                 capacities.labelFor(request.capacityId(), request.capacity()),
-                request.lengthFt(), places(request.places())));
+                request.lengthFt(), places(request.places()), request.notes()));
     }
 
     /** The detail body, with the registering account's name looked up for display. */
@@ -156,7 +157,7 @@ public class VehicleController {
         return detail(vehicles.update(id, request.registrationNumber(),
                 request.bodyTypeId(), request.noOfAxles(), request.noOfWheels(),
                 capacities.labelFor(request.capacityId(), request.capacity()),
-                request.lengthFt(), request.notes()));
+                request.lengthFt(), request.notes(), request.verified()));
     }
 
     @Operation(summary = "Take a vehicle off the road",

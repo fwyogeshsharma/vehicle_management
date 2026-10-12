@@ -63,6 +63,10 @@ public final class IntakeDtos {
                           Long bodyTypeId, Long capacityId,
                           /** The CSR's, or for wheels the app's when uncorrected. Null if unknown. */
                           Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
+                          /** The CSR has confirmed the details; copied to the vehicle on completion. */
+                          boolean verified,
+                          /** The CSR's remarks; copied onto the vehicle on completion. */
+                          String notes,
                           short attempts, String processingError,
                           Long vehicleId, String reviewedBy, String reviewNote,
                           OffsetDateTime capturedAt, OffsetDateTime createdAt,
@@ -88,6 +92,7 @@ public final class IntakeDtos {
                     i.plate(), i.mobiles(), i.company(), i.driverName(), i.companyMobile(),
                     i.getBodyTypeId(), i.getCapacityId(),
                     i.noOfAxles(), i.noOfWheels(), i.lengthFt(),
+                    i.isVerified(), i.getNotes(),
                     i.getAttempts(), i.getProcessingError(),
                     i.getVehicleId(), i.getReviewedBy(), i.getReviewNote(),
                     i.getCapturedAt(), i.getCreatedAt(), i.getProcessedAt());
@@ -140,7 +145,11 @@ public final class IntakeDtos {
                                   /** A pick-list entry; stored on the vehicle as its label. */
                                   Long capacityId,
                                   BigDecimal lengthFt,
-                                  List<VehicleDtos.Place> places) {
+                                  List<VehicleDtos.Place> places,
+                                  /** Null falls back to the tick saved on the intake row. */
+                                  Boolean verified,
+                                  /** Remarks for the vehicle. Null falls back to the row's notes. */
+                                  String notes) {
     }
 
     /**
@@ -157,7 +166,11 @@ public final class IntakeDtos {
                                  /** [{state_id, city_id|null}] — a null city is the whole state. */
                                  List<Map<String, Object>> places,
                                  /** As body_type_id: null leaves it, 0 clears it. */
-                                 Short noOfAxles, Short noOfWheels, BigDecimal lengthFt) {
+                                 Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
+                                 /** Null leaves it as it was. */
+                                 Boolean verified,
+                                 /** Null leaves them; "" clears them. */
+                                 String notes) {
     }
 
     public record DiscardRequest(String reason) {

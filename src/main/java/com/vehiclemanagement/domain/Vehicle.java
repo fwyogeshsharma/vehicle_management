@@ -89,6 +89,10 @@ public class Vehicle {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    /** A person has confirmed the details (changeset 027). */
+    @Column(name = "is_verified", nullable = false)
+    private boolean verified;
+
     @Column(length = 2000)
     private String notes;
 
@@ -131,6 +135,8 @@ public class Vehicle {
     public boolean isCompanyOwned() { return Boolean.TRUE.equals(companyOwned); }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public boolean isVerified() { return verified; }
+    public void setVerified(boolean verified) { this.verified = verified; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public Long getAddedBy() { return addedBy; }

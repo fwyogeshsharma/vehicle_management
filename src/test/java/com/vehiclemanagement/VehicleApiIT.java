@@ -397,4 +397,92 @@ class VehicleApiIT extends ApiTest {
                 """, String.class))
                 .contains("gin").contains("registration_number").contains("gin_trgm_ops");
     }
+
+    // ── verified flag and notes ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("notes can be given when a vehicle is created; blank is no notes")
+    void notes_on_create() {
+        long id = idOf(post("/api/vehicles", token, body(
+                "owner_user_id", driverId, "capacity", "16 Ton", "notes", "  new tyres  ")));
+        assertThat(get("/api/vehicles/" + id, token).getBody().get("notes").asText())
+                .isEqualTo("new tyres");
+
+        long blank = idOf(post("/api/vehicles", token, body(
+                "owner_user_id", driverId, "capacity", "16 Ton", "notes", "   ")));
+        assertThat(get("/api/vehicles/" + blank, token).getBody().get("notes").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("notes can be given when registering through the intake form")
+    void notes_on_register() {
+        ResponseEntity<JsonNode> created = post("/api/vehicles/intake", token, body(
+                "registration_number", "MH12AB7777", "body_type_id", bodyTypeId,
+                "driver_name", "Suresh Patil", "driver_mobile", "9811008121",
+                "capacity", "16 Ton", "notes", "call after 6pm"));
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody().get("notes").asText()).isEqualTo("call after 6pm");
+        assertThat(created.getBody().get("verified").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("over-long notes are a 422 on the field and leave no vehicle behind")
+    void over_long_notes_are_refused() {
+        ResponseEntity<JsonNode> refused = post("/api/vehicles", token, body(
+                "owner_user_id", driverId, "capacity", "16 Ton", "notes", "x".repeat(2001)));
+
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getBody().toString()).contains("notes");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM vehicles", Long.class)).isZero();
+
+        long id = registerOwnerDriven();
+        ResponseEntity<JsonNode> edit = put("/api/vehicles/" + id, token, body(
+                "capacity", "16 Ton", "notes", "x".repeat(2001)));
+        assertThat(edit.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    @DisplayName("verified starts false, is set and cleared by an edit, and an edit without it keeps it")
+    void verified_is_set_cleared_and_kept() {
+        long id = registerOwnerDriven();
+        assertThat(get("/api/vehicles/" + id, token).getBody().get("verified").asBoolean())
+                .isFalse();
+
+        JsonNode set = put("/api/vehicles/" + id, token, body(
+                "capacity", "16 Ton", "verified", true)).getBody();
+        assertThat(set.get("verified").asBoolean()).isTrue();
+
+        // An older caller that does not know the field must not clear it.
+        JsonNode kept = put("/api/vehicles/" + id, token, body(
+                "capacity", "16 Ton", "notes", "repainted")).getBody();
+        assertThat(kept.get("verified").asBoolean()).isTrue();
+
+        JsonNode cleared = put("/api/vehicles/" + id, token, body(
+                "capacity", "16 Ton", "verified", false)).getBody();
+        assertThat(cleared.get("verified").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("the list carries the verified flag")
+    void the_list_carries_verified() {
+        long id = registerOwnerDriven();
+        put("/api/vehicles/" + id, token, body("capacity", "16 Ton", "verified", true));
+
+        JsonNode items = get("/api/vehicles", token).getBody().get("items");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).get("verified").asBoolean()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a list where nobody is recorded as adding any row is a 200, not a 500")
+    void a_list_with_no_added_by_is_fine() {
+        long id = registerOwnerDriven();
+        jdbc.update("UPDATE vehicles SET added_by = NULL WHERE id = ?", id);
+
+        ResponseEntity<JsonNode> list = get("/api/vehicles", token);
+
+        assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(list.getBody().get("items").get(0).get("added_by_name").isNull()).isTrue();
+    }
 }

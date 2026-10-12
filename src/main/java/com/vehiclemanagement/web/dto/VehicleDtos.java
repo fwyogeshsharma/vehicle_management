@@ -35,6 +35,8 @@ public final class VehicleDtos {
     public record Summary(Long id, String registrationNumber, Long bodyTypeId, String capacity,
                           BigDecimal capacityTons, Long ownerCompanyId, Long ownerUserId,
                           boolean companyOwned, boolean active,
+                          /** A person has confirmed the details. */
+                          boolean verified,
                           String contactName, String contactMobile, String contactRole,
                           Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
                           /** The first few place names, comma separated. Null when it serves nowhere. */
@@ -64,7 +66,7 @@ public final class VehicleDtos {
                                    String addedByName) {
             return new Summary(v.getId(), v.getRegistrationNumber(), v.getBodyTypeId(),
                     v.getCapacity(), v.getCapacityTons(), v.getOwnerCompanyId(),
-                    v.getOwnerUserId(), v.isCompanyOwned(), v.isActive(),
+                    v.getOwnerUserId(), v.isCompanyOwned(), v.isActive(), v.isVerified(),
                     contact == null ? null : contact.getContactName(),
                     contact == null ? null : contact.getContactMobile(),
                     contact == null ? null : contact.getContactRole(),
@@ -78,7 +80,7 @@ public final class VehicleDtos {
     public record Detail(Long id, String registrationNumber, Long bodyTypeId, Short noOfAxles,
                          Short noOfWheels, String capacity, BigDecimal capacityTons,
                          BigDecimal lengthFt, Long ownerCompanyId, Long ownerUserId,
-                         boolean companyOwned, boolean active, String notes,
+                         boolean companyOwned, boolean active, boolean verified, String notes,
                          OffsetDateTime createdAt, OffsetDateTime updatedAt,
                          /** users.id of who registered it; null for older or seeded rows. */
                          Long addedBy,
@@ -93,7 +95,7 @@ public final class VehicleDtos {
             return new Detail(v.getId(), v.getRegistrationNumber(), v.getBodyTypeId(),
                     v.getNoOfAxles(), v.getNoOfWheels(), v.getCapacity(), v.getCapacityTons(),
                     v.getLengthFt(), v.getOwnerCompanyId(), v.getOwnerUserId(),
-                    v.isCompanyOwned(), v.isActive(), v.getNotes(),
+                    v.isCompanyOwned(), v.isActive(), v.isVerified(), v.getNotes(),
                     v.getCreatedAt(), v.getUpdatedAt(), v.getAddedBy(), addedByName);
         }
     }
@@ -122,7 +124,9 @@ public final class VehicleDtos {
                                  * truck inherits its company's, and sending places for one is a
                                  * 422 rather than a silent no-op.
                                  */
-                                List<Place> places) {
+                                List<Place> places,
+                                /** Free-text remarks. Optional. */
+                                String notes) {
     }
 
     /**
@@ -160,7 +164,9 @@ public final class VehicleDtos {
                                  * <b>company's</b> locations, which all its trucks inherit;
                                  * without one they are the vehicle's own.
                                  */
-                                List<Place> places) {
+                                List<Place> places,
+                                /** Free-text remarks. Optional. */
+                                String notes) {
     }
 
     /** The truck's own attributes. Owner and drivers have their own endpoints. */
@@ -179,7 +185,9 @@ public final class VehicleDtos {
                                 /** A pick-list entry; stored on the vehicle as its label. */
                                 Long capacityId,
                                 BigDecimal lengthFt,
-                                String notes) {
+                                String notes,
+                                /** Optional: null leaves it as it is, for callers that predate it. */
+                                Boolean verified) {
     }
 
     /** Exactly one of {@code companyId} / {@code userId}. The database refuses the rest. */
