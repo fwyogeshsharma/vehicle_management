@@ -3,6 +3,8 @@ package com.vehiclemanagement;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.vehiclemanagement.domain.ProcessingStatus;
 import com.vehiclemanagement.domain.ReviewStatus;
+import com.vehiclemanagement.domain.VehicleIntake;
+import com.vehiclemanagement.repo.VehicleIntakeRepository;
 import com.vehiclemanagement.service.BodyTypeService;
 import com.vehiclemanagement.service.ImageStore;
 import com.vehiclemanagement.service.IntakeService;
@@ -44,6 +46,8 @@ class IntakeIT extends ApiTest {
     private BodyTypeService bodyTypes;
     @Autowired
     private ImageStore images;
+    @Autowired
+    private VehicleIntakeRepository intakeRows;
 
     private String token;
     private long bodyTypeId;
@@ -534,6 +538,28 @@ class IntakeIT extends ApiTest {
 
         assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(detail(refused)).contains("reading this one now");
+    }
+
+    @Test
+    @DisplayName("a save from a copy loaded before OCR finished does not undo the worker's result")
+    void a_stale_save_keeps_the_workers_columns() {
+        // The race: a CSR's request loads the row while it is QUEUED, the worker commits DONE,
+        // then the request saves. Hibernate writes the whole row, so without updatable = false
+        // on the machine columns this put QUEUED back and nulled the readings.
+        long id = idOf(uploadPhotos(1));
+        VehicleIntake loadedBeforeOcr = intakeRows.findById(id).orElseThrow();
+        ocrFinished(id, "MH12AB1234", "[\"9811008120\"]", "Kumar Roadways");
+
+        loadedBeforeOcr.setReportedBy("edited by a CSR");
+        intakeRows.saveAndFlush(loadedBeforeOcr);
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT processing_status, ocr_plate, ocr_company, reported_by"
+                        + " FROM vehicle_intake WHERE id = ?", id);
+        assertThat(row.get("processing_status")).isEqualTo("DONE");
+        assertThat(row.get("ocr_plate")).isEqualTo("MH12AB1234");
+        assertThat(row.get("ocr_company")).isEqualTo("Kumar Roadways");
+        assertThat(row.get("reported_by")).isEqualTo("edited by a CSR");
     }
 
     // ── completion ──────────────────────────────────────────────────────────────

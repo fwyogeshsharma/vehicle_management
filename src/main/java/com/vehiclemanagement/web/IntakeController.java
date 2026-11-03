@@ -91,7 +91,7 @@ public class IntakeController {
      * <p>The photos are the point; a malformed clock on a field device is not worth losing them
      * over. FreightDesk makes the same call for the same reason.
      */
-    private static OffsetDateTime parseCapturedAt(String value) {
+    static OffsetDateTime parseCapturedAt(String value) {
         if (value == null || value.isBlank()) {
             return OffsetDateTime.now();
         }

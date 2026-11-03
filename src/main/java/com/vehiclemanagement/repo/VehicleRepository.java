@@ -72,7 +72,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
                    s.name       AS stateName,
                    l.city_id    AS cityId,
                    c.name       AS cityName,
-                   l.source     AS source
+                   l.source     AS source,
+                   l.price      AS price
               FROM vehicle_effective_locations l
               JOIN states s ON s.id = l.state_id
               LEFT JOIN cities c ON c.id = l.city_id
@@ -297,5 +298,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
 
         /** COMPANY or VEHICLE — which side of the fallback answered. */
         String getSource();
+
+        /** The driver's quoted total for running here; null for the company's rows and unasked. */
+        java.math.BigDecimal getPrice();
     }
 }

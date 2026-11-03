@@ -7,6 +7,7 @@ import com.vehiclemanagement.domain.VehicleIntake;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -153,4 +154,21 @@ public interface VehicleIntakeRepository extends JpaRepository<VehicleIntake, Lo
                      @Param("processing") String processing,
                      @Param("plate") String plate,
                      @Param("location") String location);
+
+    /**
+     * Put a row back in the OCR queue -- the one write this service makes to the machine half.
+     *
+     * <p>A conditional UPDATE, not a save: the entity's machine columns are not updatable, and
+     * the WHERE re-checks the state in the same statement, so a worker claiming the row between
+     * the caller's read and this write cannot be overridden. {@code attempts} is deliberately
+     * left alone. Returns the number of rows changed (0 or 1).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE vehicle_intake
+               SET processing_status = 'QUEUED', processing_error = NULL,
+                   claimed_at = NULL, processed_at = NULL
+             WHERE id = :id AND review_status = 'PENDING' AND processing_status <> 'PROCESSING'
+            """, nativeQuery = true)
+    int requeue(@Param("id") long id);
 }

@@ -136,18 +136,24 @@ public class VehicleIntake {
 
     // ── Dimension 1: the machine. Written by the Python worker, not from here. ───────────
 
+    // Every column in this block is updatable = false. Hibernate writes the whole row on a
+    // save, so without it a CSR's edit that loaded the row before the worker committed would
+    // write the stale machine half back over the worker's result -- DONE turned back into
+    // PROCESSING, the readings nulled. Java sets these only on INSERT (markNothingToRead) and
+    // through the conditional UPDATE in VehicleIntakeRepository.requeue.
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "processing_status", nullable = false, length = 16)
+    @Column(name = "processing_status", nullable = false, length = 16, updatable = false)
     private ProcessingStatus processingStatus = ProcessingStatus.QUEUED;
 
-    @Column(name = "processing_error", length = 500)
+    @Column(name = "processing_error", length = 500, updatable = false)
     private String processingError;
 
-    @Column(name = "processed_at")
+    @Column(name = "processed_at", updatable = false)
     private OffsetDateTime processedAt;
 
     /** When a worker took it. Null unless PROCESSING; a stale one is reclaimed by the worker. */
-    @Column(name = "claimed_at")
+    @Column(name = "claimed_at", updatable = false)
     private OffsetDateTime claimedAt;
 
     /**
@@ -157,10 +163,10 @@ public class VehicleIntake {
      * worker looks at it again; this counts the times a human pressed Read again, so a row that
      * has been fought over is visible as such.
      */
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private short attempts;
 
-    @Column(name = "ocr_plate", length = 32)
+    @Column(name = "ocr_plate", length = 32, updatable = false)
     private String ocrPlate;
 
     /**
@@ -171,19 +177,19 @@ public class VehicleIntake {
      * second, which was legible in the same photo all along.
      */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "ocr_mobiles", nullable = false)
+    @Column(name = "ocr_mobiles", nullable = false, updatable = false)
     private List<String> ocrMobiles = new ArrayList<>();
 
-    @Column(name = "ocr_company", length = 160)
+    @Column(name = "ocr_company", length = 160, updatable = false)
     private String ocrCompany;
 
     /** HIGH / LOW / NONE — how many consistent reads backed the plate, not a probability. */
-    @Column(name = "ocr_confidence", length = 8)
+    @Column(name = "ocr_confidence", length = 8, updatable = false)
     private String ocrConfidence;
 
     /** Every candidate and body text the engine returned, kept so a bad read can be explained. */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "ocr_raw")
+    @Column(name = "ocr_raw", updatable = false)
     private Map<String, Object> ocrRaw;
 
     // ── What the CSR says it actually is. Wins over the machine, never overwrites it. ───
@@ -510,25 +516,6 @@ public class VehicleIntake {
         this.reviewedBy = by;
         this.reviewedAt = OffsetDateTime.now();
         this.reviewNote = truncate(reason);
-    }
-
-    /**
-     * Put a FAILED row back in the queue.
-     *
-     * <p>The only place this service writes the machine dimension, and <b>the only way a failed
-     * photo is ever read again</b> — the worker retries nothing on its own. FreightDesk cannot
-     * do even this: its FAILED is terminal and not re-run by a restart either, so an object
-     * store that was briefly unreachable loses that photo's reading permanently.
-     *
-     * <p>{@code attempts} is deliberately <b>not</b> reset. It counts how many times a human has
-     * asked, and a row on its fourth attempt is worth someone noticing rather than quietly
-     * starting over at one.
-     */
-    public void requeue() {
-        this.processingStatus = ProcessingStatus.QUEUED;
-        this.processingError = null;
-        this.claimedAt = null;
-        this.processedAt = null;
     }
 
     private static String truncate(String s) {

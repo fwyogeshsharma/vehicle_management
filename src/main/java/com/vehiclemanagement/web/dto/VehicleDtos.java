@@ -226,11 +226,11 @@ public final class VehicleDtos {
      * @param cityName null means the whole state, which matches every city in it.
      */
     public record Location(Long stateId, String stateName, Long cityId, String cityName,
-                           String source) {
+                           String source, BigDecimal price) {
 
         public static Location from(VehicleRepository.EffectiveLocation l) {
             return new Location(l.getStateId(), l.getStateName(), l.getCityId(), l.getCityName(),
-                    l.getSource());
+                    l.getSource(), l.getPrice());
         }
     }
 
@@ -239,10 +239,10 @@ public final class VehicleDtos {
     }
 
     /** A state, and optionally one city inside it. A null city means the whole state. */
-    public record Place(@NotNull Long stateId, Long cityId) {
+    public record Place(@NotNull Long stateId, Long cityId, BigDecimal price) {
 
         public VehicleService.CityRef toRef() {
-            return new VehicleService.CityRef(stateId, cityId);
+            return new VehicleService.CityRef(stateId, cityId, price);
         }
     }
 }

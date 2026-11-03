@@ -130,6 +130,14 @@ public class SecurityConfig {
                         // whoever debugs it to the CORS config, where nothing is wrong.
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
+                        // The one anonymous WRITE: photo intake through a personal secret link
+                        // (PublicUploadController). Not a reopening of the removed anonymous
+                        // uploads -- the token resolves to an account that is re-checked on
+                        // every request, so deactivating the person still ends their access, and
+                        // the row is filed under that account. Do not widen this pattern.
+                        .requestMatchers("/api/public/upload/*", "/api/public/upload/*/photos",
+                                "/api/public/upload/*/masters")
+                            .permitAll()
                         // NOTE: /api/intake has no unauthenticated routes. The OCR worker
                         // used to claim work and post results through two permitAll endpoints
                         // gated on a shared secret; it now reads and writes vehicle_intake over

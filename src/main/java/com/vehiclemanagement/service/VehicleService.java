@@ -295,6 +295,14 @@ public class VehicleService {
             // exactly the rule the desk should not have to know.
             if (companyOwned) {
                 companyLocations(company.getId(), places);
+                // A quote is about THIS truck, and company_x_location is shared by every truck
+                // the company owns. So a place that came with a price is also kept as the
+                // truck's own (additive to the company's, since changeset 009), where it can
+                // carry the price.
+                List<CityRef> quoted = places.stream().filter(p -> p.price() != null).toList();
+                if (!quoted.isEmpty()) {
+                    setPreferredLocations(vehicle.getId(), quoted);
+                }
             } else {
                 setPreferredLocations(vehicle.getId(), places);
             }
@@ -508,8 +516,8 @@ public class VehicleService {
         return ConstraintErrors.translating(() -> {
             for (CityRef place : places) {
                 requireCityInState(place);
-                vehicleLocations.saveAndFlush(
-                        new VehicleLocation(vehicleId, place.stateId(), place.cityId()));
+                vehicleLocations.saveAndFlush(new VehicleLocation(
+                        vehicleId, place.stateId(), place.cityId(), quote(place.price())));
             }
             return vehicleLocations.findByVehicleId(vehicleId);
         });
@@ -769,8 +777,27 @@ public class VehicleService {
     public record OwnerChange(Vehicle vehicle, int removedDrivers) {
     }
 
-    /** A place: a state, and optionally one city inside it. A null city means the whole state. */
-    public record CityRef(Long stateId, Long cityId) {
+    /** A quote: not asked (null) is fine, negative is not, and it is held to paise. */
+    private static BigDecimal quote(BigDecimal price) {
+        if (price == null) {
+            return null;
+        }
+        if (price.signum() < 0) {
+            throw new FieldValidationException("places", "A quoted price cannot be negative.");
+        }
+        return price.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * A place: a state, and optionally one city inside it. A null city means the whole state.
+     * {@code price} is what the driver quoted as a total for running there; only a vehicle's own
+     * locations keep it, and the company paths ignore it.
+     */
+    public record CityRef(Long stateId, Long cityId, BigDecimal price) {
+        public CityRef(Long stateId, Long cityId) {
+            this(stateId, cityId, null);
+        }
+
         public static CityRef wholeState(Long stateId) {
             return new CityRef(stateId, null);
         }

@@ -271,6 +271,13 @@ public class IntakeService {
                     materialType, noOfWheels, axleType, capacityId, companyMobile, places);
         }
 
+        /** As above, plus a capacity pick-list id (unknown or retired ids are dropped later). */
+        public Report withCapacityId(Long capacityId) {
+            return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
+                    location, latitude, longitude, driverName, loadedStatus, bodyTypeId,
+                    materialType, noOfWheels, axleType, capacityId, companyMobile, places);
+        }
+
         /** As above, plus the routes as a JSON string: {@code [{"state_id":1,"city_id":null}]}. */
         public Report withPlaces(String placesJson) {
             return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
@@ -307,6 +314,12 @@ public class IntakeService {
                 Map<String, Object> place = new java.util.LinkedHashMap<>();
                 place.put("state_id", state.asLong());
                 place.put("city_id", city != null && city.canConvertToLong() ? city.asLong() : null);
+                // What the driver quoted, if a number and not negative. Anything else is dropped
+                // rather than failing the upload: a bad price must not cost the photos.
+                com.fasterxml.jackson.databind.JsonNode price = n.get("price");
+                if (price != null && price.isNumber() && price.decimalValue().signum() >= 0) {
+                    place.put("price", price.decimalValue());
+                }
                 out.add(place);
             }
         } catch (Exception notJson) {
@@ -784,9 +797,16 @@ public class IntakeService {
             throw new ApiException.Conflict(
                     "A worker is reading this one now. Wait for it to finish or fail.");
         }
-        intake.requeue();
+        if (intakes.requeue(id) == 0) {
+            // The row changed between the checks above and the UPDATE -- a worker claimed it,
+            // or someone completed it. The re-read gives the caller the current reason.
+            VehicleIntake now = get(id);
+            throw new ApiException.Conflict(now.getProcessingStatus() == ProcessingStatus.PROCESSING
+                    ? "A worker is reading this one now. Wait for it to finish or fail."
+                    : "This intake changed while you were looking at it. Reload and try again.");
+        }
         log.info("intake {} re-queued for OCR", id);
-        return intakes.saveAndFlush(intake);
+        return get(id);
     }
 
     private static void requireUnreviewed(VehicleIntake intake, String verb) {

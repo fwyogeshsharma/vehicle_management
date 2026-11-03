@@ -120,7 +120,7 @@ public class LrService {
     @Transactional(readOnly = true)
     public String nextNumber() {
         Integer next = receipts.peekNextNumber(DEFAULT_SERIES);
-        return format(next == null ? 1 : next);
+        return format(firstFreeFrom(next == null ? 1 : next));
     }
 
     // ── writing ─────────────────────────────────────────────────────────────────
@@ -131,6 +131,15 @@ public class LrService {
         Integer seq = receipts.lockNextNumber(DEFAULT_SERIES);
         if (seq == null) {
             throw new ApiException(500, "Numbering series " + DEFAULT_SERIES + " is missing.");
+        }
+        if (Normalizer.clean(req.lrNumber()) == null) {
+            // A hand-typed receipt may already hold this slot's auto number (someone saved
+            // "LR-010" while the counter was at 7). Step past it under the lock; refusing
+            // instead would roll the bump back too and block every later create for good.
+            int free = firstFreeFrom(seq);
+            for (; seq < free; seq++) {
+                receipts.bumpCounter(DEFAULT_SERIES);
+            }
         }
         receipts.bumpCounter(DEFAULT_SERIES);
 
@@ -221,6 +230,14 @@ public class LrService {
         } else {
             lr.setStatus(next);
         }
+    }
+
+    /** The first counter value at or after {@code seq} whose auto number is not in use. */
+    private int firstFreeFrom(int seq) {
+        while (receipts.existsByLrNumber(format(seq))) {
+            seq++;
+        }
+        return seq;
     }
 
     private static String format(int seq) {

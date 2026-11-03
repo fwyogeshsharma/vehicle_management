@@ -2,6 +2,7 @@ package com.vehiclemanagement.domain;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
@@ -37,6 +38,14 @@ public class VehicleLocation {
     @Column(name = "city_id")
     private Long cityId;
 
+    /**
+     * What the driver quoted, as a TOTAL for running here. Null means nobody asked. Held on the
+     * vehicle's own row only: a company's locations are shared by every truck it owns, so one
+     * driver's quote has no honest home there.
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal price;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -44,15 +53,21 @@ public class VehicleLocation {
     }
 
     public VehicleLocation(Long vehicleId, Long stateId, Long cityId) {
+        this(vehicleId, stateId, cityId, null);
+    }
+
+    public VehicleLocation(Long vehicleId, Long stateId, Long cityId, BigDecimal price) {
         this.vehicleId = vehicleId;
         this.stateId = stateId;
         this.cityId = cityId;
+        this.price = price;
     }
 
     public Long getId() { return id; }
     public Long getVehicleId() { return vehicleId; }
     public Long getStateId() { return stateId; }
     public Long getCityId() { return cityId; }
+    public BigDecimal getPrice() { return price; }
     public boolean isWholeState() { return cityId == null; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }

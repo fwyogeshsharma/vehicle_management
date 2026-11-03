@@ -125,6 +125,20 @@ class LorryReceiptIT extends ApiTest {
             assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
             assertThat(detail(again)).contains("BK-7741");
         }
+
+        @Test
+        @DisplayName("a hand-typed number that the counter later reaches is stepped over")
+        void auto_numbering_skips_a_hand_typed_number() {
+            // Takes counter slot 1 but holds the number slot 2 would have produced.
+            Map<String, Object> own = minimal();
+            own.put("lr_number", "lr-002");
+            assertThat(created(own).get("lr_number").asText()).isEqualTo("LR-002");
+
+            assertThat(get("/api/lr/next-number", token).getBody().get("lr_number").asText())
+                    .isEqualTo("LR-003");
+            assertThat(created(minimal()).get("lr_number").asText()).isEqualTo("LR-003");
+            assertThat(created(minimal()).get("lr_number").asText()).isEqualTo("LR-004");
+        }
     }
 
     // ── the snapshot, which is the whole point ──────────────────────────────────
