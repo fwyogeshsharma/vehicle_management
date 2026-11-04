@@ -47,6 +47,27 @@ class VehicleIntakeIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("the driver's name is optional: the mobile identifies them, and is their name until known")
+    void a_blank_driver_name_is_filed_under_the_mobile() {
+        ResponseEntity<JsonNode> created = intake("MH12AB4321", "", "9811008777", "Kumar Roadways");
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode drivers = get("/api/vehicles/" + idOf(created) + "/drivers", token).getBody();
+        assertThat(drivers).hasSize(1);
+        assertThat(drivers.get(0).get("name").asText()).isEqualTo("9811008777");
+
+        // An existing driver found by the same number keeps the name already on file.
+        ResponseEntity<JsonNode> again = intake("MH12AB4322", null, "9811008777", "Kumar Roadways");
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode second = get("/api/vehicles/" + idOf(again) + "/drivers", token).getBody();
+        assertThat(second.get(0).get("user_id").asLong())
+                .isEqualTo(drivers.get(0).get("user_id").asLong());
+
+        // The mobile is still required.
+        assertThat(intake("MH12AB4323", "Someone", "", "Kumar Roadways").getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     @DisplayName("a company truck: company created, driver created, hired, and assigned")
     void the_whole_chain_in_one_call() {
         ResponseEntity<JsonNode> created =

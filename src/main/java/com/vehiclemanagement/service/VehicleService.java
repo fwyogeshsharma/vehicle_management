@@ -219,12 +219,16 @@ public class VehicleService {
         String cleanDriver = Normalizer.clean(contacts.driverName());
         String cleanCompany = Normalizer.clean(contacts.companyName());
 
-        if (cleanDriver == null) {
-            throw new FieldValidationException("driver_name", "Who drives it? A name is required.");
-        }
         // Normalising first means the "already on file?" lookup uses the same spelling the table
         // does -- otherwise "+91 98110 08120" creates a second record for an existing driver.
         String mobile = Normalizer.mobile(contacts.driverMobile(), "driver_mobile");
+        // The name is optional: the mobile is what identifies a driver. A NEW driver given no
+        // name is filed under their number (users.name is NOT NULL) until someone learns it; an
+        // existing driver keeps the name already on file.
+        if (cleanDriver == null) {
+            cleanDriver = mobile;
+        }
+        final String driverName = cleanDriver;
         String altMobile = Normalizer.optionalMobile(contacts.driverAltMobile(),
                 "driver_alt_mobile");
         if (altMobile != null && altMobile.equals(mobile)) {
@@ -236,7 +240,7 @@ public class VehicleService {
         if (driver == null) {
             final String alt = altMobile;
             driver = ConstraintErrors.translating(() -> {
-                User created = new User(cleanDriver, mobile, UserType.DRIVER);
+                User created = new User(driverName, mobile, UserType.DRIVER);
                 created.setAltMobile(alt);
                 return users.saveAndFlush(created);
             });

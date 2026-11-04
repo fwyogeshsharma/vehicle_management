@@ -126,7 +126,7 @@ public final class IntakeDtos {
                                   String registrationNumber,
                                   /** Optional: null means "not known yet". */
                                   Long bodyTypeId,
-                                  @NotBlank String driverName,
+                                  String driverName,
                                   @NotBlank String driverMobile,
                                   /**
                                    * A second way to reach the same driver. A truck's side often
