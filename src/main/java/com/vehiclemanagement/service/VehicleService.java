@@ -103,6 +103,16 @@ public class VehicleService {
                           Long ownerCompanyId, Long ownerUserId,
                           Short axles, Short wheels, String capacity, BigDecimal lengthFt,
                           boolean ownerAlsoDrives) {
+        return create(registrationNumber, bodyTypeId, ownerCompanyId, ownerUserId,
+                axles, wheels, capacity, lengthFt, ownerAlsoDrives, true);
+    }
+
+    /** As above; {@code capacityRequired} is false only for a vehicle made from a photo intake. */
+    @Transactional
+    public Vehicle create(String registrationNumber, Long bodyTypeId,
+                          Long ownerCompanyId, Long ownerUserId,
+                          Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                          boolean ownerAlsoDrives, boolean capacityRequired) {
         if (ownerAlsoDrives && ownerUserId == null) {
             throw new FieldValidationException("owner",
                     "A company cannot drive its own vehicle. Assign a driver instead.");
@@ -115,7 +125,7 @@ public class VehicleService {
         }
         requireExactlyOneOwner(ownerCompanyId, ownerUserId);
         checkBodyType(bodyTypeId);
-        validateDimensions(axles, wheels, capacity, lengthFt);
+        validateDimensions(axles, wheels, capacity, lengthFt, capacityRequired);
 
         return ConstraintErrors.translating(() -> {
             Vehicle v = new Vehicle(reg, bodyTypeId);
@@ -193,6 +203,9 @@ public class VehicleService {
         }
     }
 
+    /** The name a driver is filed under until somebody learns it. */
+    public static final String UNKNOWN_DRIVER = "Unknown driver";
+
     @Transactional
     public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
                           Short axles, Short wheels, String capacity, BigDecimal lengthFt) {
@@ -216,6 +229,15 @@ public class VehicleService {
     public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
                           Short axles, Short wheels, String capacity, BigDecimal lengthFt,
                           List<CityRef> places) {
+        return intake(registrationNumber, bodyTypeId, contacts, axles, wheels, capacity, lengthFt,
+                places, true);
+    }
+
+    /** As above; {@code capacityRequired} is false for a completed photo intake. */
+    @Transactional
+    public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
+                          Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                          List<CityRef> places, boolean capacityRequired) {
         String cleanDriver = Normalizer.clean(contacts.driverName());
         String cleanCompany = Normalizer.clean(contacts.companyName());
 
@@ -223,10 +245,11 @@ public class VehicleService {
         // does -- otherwise "+91 98110 08120" creates a second record for an existing driver.
         String mobile = Normalizer.mobile(contacts.driverMobile(), "driver_mobile");
         // The name is optional: the mobile is what identifies a driver. A NEW driver given no
-        // name is filed under their number (users.name is NOT NULL) until someone learns it; an
-        // existing driver keeps the name already on file.
+        // name is filed as "Unknown driver" (users.name is NOT NULL) until somebody learns it --
+        // NOT under their number, which made the name and the mobile read as the same thing. An
+        // existing driver found by that mobile keeps the name already on file.
         if (cleanDriver == null) {
-            cleanDriver = mobile;
+            cleanDriver = UNKNOWN_DRIVER;
         }
         final String driverName = cleanDriver;
         String altMobile = Normalizer.optionalMobile(contacts.driverAltMobile(),
@@ -280,7 +303,7 @@ public class VehicleService {
                 companyOwned ? null : driver.getId(),
                 axles, wheels, capacity, lengthFt,
                 // A person-owned truck gets its owner recorded as the driver in one step.
-                !companyOwned);
+                !companyOwned, capacityRequired);
 
         if (companyOwned) {
             // Employment FIRST. fk_vxu_employed refuses a driver who is not on the owning
@@ -369,13 +392,15 @@ public class VehicleService {
     public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
                           Short axles, Short wheels, String capacity, BigDecimal lengthFt,
                           List<CityRef> places, String notes) {
+        // Only this path (a completed photo intake) may leave the capacity blank: the desk often
+        // does not have it on the first call.
         return annotate(intake(registrationNumber, bodyTypeId, contacts,
-                axles, wheels, capacity, lengthFt, places), notes);
+                axles, wheels, capacity, lengthFt, places, false), notes);
     }
 
     /** Same transaction as the create, so a refused note leaves no vehicle behind. */
     private Vehicle annotate(Vehicle v, String notes) {
-        String clean = Normalizer.clean(notes);
+        String clean = Normalizer.cleanLines(notes);
         if (clean == null) {
             return v;
         }
@@ -559,7 +584,9 @@ public class VehicleService {
             throw new ApiException.Conflict("Vehicle " + reg + " is already registered.");
         }
         checkBodyType(bodyTypeId);
-        validateDimensions(axles, wheels, capacity, lengthFt);
+        // A vehicle made from a photo intake may have no capacity yet; editing its other details
+        // must not force one. Once it has one, it stays required.
+        validateDimensions(axles, wheels, capacity, lengthFt, v.getCapacity() != null);
         if (reg != null) {
             v.setRegistrationNumber(reg);
         }
@@ -570,8 +597,8 @@ public class VehicleService {
         // two cannot end up disagreeing. Do not add a Java-side mirror.
         v.setCapacity(Normalizer.clean(capacity));
         v.setLengthFt(lengthFt);
-        requireNotesLength(Normalizer.clean(notes));
-        v.setNotes(Normalizer.clean(notes));
+        requireNotesLength(Normalizer.cleanLines(notes));
+        v.setNotes(Normalizer.cleanLines(notes));
         if (verified != null) {
             v.setVerified(verified);
         }
@@ -751,13 +778,14 @@ public class VehicleService {
      * <p>Axles and wheels are optional: the desk rarely has them on the first call. The ratio
      * is only checked when both are given.
      */
-    private void validateDimensions(Short axles, Short wheels, String capacity, BigDecimal lengthFt) {
+    private void validateDimensions(Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                                    boolean capacityRequired) {
         if (axles != null && wheels != null && (wheels < axles * 2 || wheels > axles * 4)) {
             throw new FieldValidationException("no_of_wheels",
                     "A " + axles + "-axle vehicle has between " + (axles * 2) + " and "
                     + (axles * 4) + " wheels.");
         }
-        if (Normalizer.clean(capacity) == null) {
+        if (capacityRequired && Normalizer.clean(capacity) == null) {
             throw new FieldValidationException("capacity", "Capacity is required, e.g. \"20 Ton\".");
         }
         BigDecimal tons = Normalizer.capacityTons(capacity);

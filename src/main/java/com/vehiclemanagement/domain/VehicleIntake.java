@@ -260,7 +260,14 @@ public class VehicleIntake {
     @Column(name = "is_verified", nullable = false)
     private boolean verified;
 
-    /** The CSR's remarks (changeset 028). Copied onto vehicles.notes at completion. */
+    /** The CSR still has to ring the driver (changeset 034). */
+    @Column(name = "call_pending", nullable = false)
+    private boolean callPending;
+
+    /**
+     * Legacy single remark (changeset 028). Nothing writes it any more: remarks are rows of
+     * {@code intake_notes} since changeset 034.
+     */
     @Column(length = 2000)
     private String notes;
 
@@ -486,6 +493,8 @@ public class VehicleIntake {
         }
     }
 
+    public boolean isCallPending() { return callPending; }
+    public void setCallPending(boolean callPending) { this.callPending = callPending; }
     public boolean isVerified() { return verified; }
     public void setVerified(boolean verified) { this.verified = verified; }
     public String getNotes() { return notes; }

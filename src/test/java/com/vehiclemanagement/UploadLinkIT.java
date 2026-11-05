@@ -124,9 +124,11 @@ class UploadLinkIT extends ApiTest {
         assertThat(sent.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         long id = sent.getBody().get("id").asLong();
         Map<String, Object> row = jdbc.queryForMap(
-                "SELECT reported_company, capacity_id, jsonb_array_length(edited_places) AS n"
+                "SELECT reported_company, reported_driver_name, capacity_id, jsonb_array_length(edited_places) AS n"
                         + " FROM vehicle_intake WHERE id = ?", id);
-        assertThat(row.get("reported_company")).isEqualTo("Kumar Roadways");
+        // The name typed is a person's: the driver's name, never a company.
+        assertThat(row.get("reported_driver_name")).isEqualTo("Kumar Roadways");
+        assertThat(row.get("reported_company")).isNull();
         assertThat(row.get("capacity_id")).isEqualTo(nine);
         assertThat(row.get("n")).isEqualTo(2);
 

@@ -101,12 +101,13 @@ public class PublicUploadController {
         links.checkAllowance(sender.getId());
 
         VehicleIntake saved = intake.upload(images, IntakeService.Report
-                // The owner is filed as the report's company: an owner is the entity the truck
-                // is registered to, and that is what the CSR checks and what becomes the
-                // vehicle's owner on completion.
-                .of(reportedPlate, reportedMobile, owner, sender.getName(),
+                // The name and mobile the sender typed are a PERSON's -- the driver, or the
+                // owner who drives -- so they are filed as the driver's name and mobile, not as
+                // a company and its number. A company is only ever named by the CSR.
+                .of(reportedPlate, reportedMobile, null, sender.getName(),
                         sender.getMobile(), IntakeController.parseCapturedAt(capturedAt),
                         null, null, null)
+                .withDriverName(owner)
                 .withCapacityId(capacityId)
                 .withPlaces(places),
                 sender.getId());

@@ -54,6 +54,21 @@ public final class Normalizer {
         return v.isEmpty() ? null : v;
     }
 
+    /**
+     * As {@link #clean}, but keeps line breaks: each line is trimmed and has its runs of spaces
+     * collapsed, and empty lines are dropped. For free-text remarks that are one entry per line.
+     */
+    public static String cleanLines(String value) {
+        if (value == null) {
+            return null;
+        }
+        String v = java.util.Arrays.stream(value.split("\\R"))
+                .map(line -> line.trim().replaceAll("[ \\t]+", " "))
+                .filter(line -> !line.isEmpty())
+                .collect(java.util.stream.Collectors.joining("\n"));
+        return v.isEmpty() ? null : v;
+    }
+
     /** Indian mobile to 10 digits. Accepts +91 / 91 / 0 prefixes, spaces and dashes. */
     public static String mobile(String raw, String field) {
         String digits = NON_DIGIT.matcher(raw == null ? "" : raw).replaceAll("");

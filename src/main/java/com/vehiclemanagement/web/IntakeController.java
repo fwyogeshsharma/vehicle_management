@@ -140,8 +140,10 @@ public class IntakeController {
         // One query for every uploader on the page, not one per row.
         var names = users.namesById(
                 found.getContent().stream().map(VehicleIntake::getUploadedBy).toList());
+        var notes = intake.notesFor(found.getContent().stream().map(VehicleIntake::getId).toList());
         return PageResponse.of(found,
-                i -> IntakeDtos.Summary.from(i, names.get(i.getUploadedBy())));
+                i -> IntakeDtos.Summary.from(i, names.get(i.getUploadedBy()),
+                        notes.getOrDefault(i.getId(), List.of())));
     }
 
     /** Tab badges. Takes the list's filters, so a badge counts what its tab would show. */
@@ -176,7 +178,8 @@ public class IntakeController {
     public IntakeDtos.Detail get(@PathVariable long id) {
         VehicleIntake row = intake.get(id);
         return IntakeDtos.Detail.from(row, row.getUploadedBy() == null ? null
-                : users.namesById(List.of(row.getUploadedBy())).get(row.getUploadedBy()));
+                : users.namesById(List.of(row.getUploadedBy())).get(row.getUploadedBy()),
+                intake.notesOf(id));
     }
 
     @Operation(summary = "One uploaded photo",
@@ -220,7 +223,7 @@ public class IntakeController {
     public IntakeDtos.Summary complete(@AuthenticationPrincipal Jwt jwt,
                                        @PathVariable long id,
                                        @Valid @RequestBody IntakeDtos.CompleteRequest request) {
-        return IntakeDtos.Summary.from(intake.complete(
+        VehicleIntake done = intake.complete(
                 id, Principal.username(jwt), request.registrationNumber(), request.bodyTypeId(),
                 new com.vehiclemanagement.service.VehicleService.Contacts(
                         request.driverName(), request.driverMobile(), request.driverAltMobile(),
@@ -235,7 +238,8 @@ public class IntakeController {
                 request.places() == null
                         ? List.of()
                         : request.places().stream().map(VehicleDtos.Place::toRef).toList(),
-                request.verified(), request.notes()));
+                request.verified(), request.notes());
+        return IntakeDtos.Summary.from(done, null, intake.notesOf(id));
     }
 
     @Operation(summary = "Correct what the photo says",
@@ -247,11 +251,12 @@ public class IntakeController {
     public IntakeDtos.Summary correct(@AuthenticationPrincipal Jwt jwt,
                                       @PathVariable long id,
                                       @RequestBody IntakeDtos.CorrectRequest request) {
-        return IntakeDtos.Summary.from(intake.correct(id, Principal.username(jwt),
+        VehicleIntake saved = intake.correct(id, Principal.username(jwt),
                 request.plate(), request.mobiles(), request.company(), request.driverName(),
                 request.bodyTypeId(), request.capacityId(), request.places(),
                 request.companyMobile(), request.noOfAxles(), request.noOfWheels(),
-                request.lengthFt(), request.verified(), request.notes()));
+                request.lengthFt(), request.verified(), request.callPending(), request.notes());
+        return IntakeDtos.Summary.from(saved, null, intake.notesOf(id));
     }
 
     @Operation(summary = "Throw an intake away, permanently",

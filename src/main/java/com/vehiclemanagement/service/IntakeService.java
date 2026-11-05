@@ -3,6 +3,7 @@ package com.vehiclemanagement.service;
 import com.vehiclemanagement.config.VehicleManagementProperties;
 import com.vehiclemanagement.domain.BodyType;
 import com.vehiclemanagement.domain.Company;
+import com.vehiclemanagement.domain.IntakeNote;
 import com.vehiclemanagement.domain.ProcessingStatus;
 import com.vehiclemanagement.domain.ReviewStatus;
 import com.vehiclemanagement.domain.Vehicle;
@@ -10,6 +11,7 @@ import com.vehiclemanagement.domain.VehicleIntake;
 import com.vehiclemanagement.exception.ApiException;
 import com.vehiclemanagement.exception.FieldValidationException;
 import com.vehiclemanagement.repo.BodyTypeRepository;
+import com.vehiclemanagement.repo.IntakeNoteRepository;
 import com.vehiclemanagement.repo.CapacityRepository;
 import com.vehiclemanagement.domain.Capacity;
 import com.vehiclemanagement.repo.CompanyRepository;
@@ -30,6 +32,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -77,7 +80,10 @@ public class IntakeService {
         COMPLETED,
         /** Rejected by a CSR. */
         DISCARDED,
-        /** Everything, newest first. */
+        /**
+         * Everything still open, newest first: waiting, failed and to-call alike. A row that has
+         * become a vehicle (or was rejected) has left the worklist and lives under its own tab.
+         */
         ALL
     }
 
@@ -92,12 +98,14 @@ public class IntakeService {
     private final UserRepository users;
     private final BodyTypeRepository bodyTypes;
     private final CapacityRepository capacities;
+    private final IntakeNoteRepository noteLog;
 
     public IntakeService(VehicleIntakeRepository intakes, VehicleRepository vehicles,
                          VehicleService vehicleService, ImageStore images,
                          VehicleManagementProperties properties,
                          CompanyRepository companies, UserRepository users,
-                         BodyTypeRepository bodyTypes, CapacityRepository capacities) {
+                         BodyTypeRepository bodyTypes, CapacityRepository capacities,
+                         IntakeNoteRepository noteLog) {
         this.intakes = intakes;
         this.vehicles = vehicles;
         this.vehicleService = vehicleService;
@@ -107,6 +115,62 @@ public class IntakeService {
         this.users = users;
         this.bodyTypes = bodyTypes;
         this.capacities = capacities;
+        this.noteLog = noteLog;
+    }
+
+    // ── the remarks log ─────────────────────────────────────────────────────────
+
+    /** One row's remarks, oldest first. */
+    public List<IntakeNote> notesOf(long intakeId) {
+        return noteLog.findByIntakeIdOrderByCreatedAtAscIdAsc(intakeId);
+    }
+
+    /** The remarks of every row on a page, in one query. */
+    public Map<Long, List<IntakeNote>> notesFor(Collection<Long> intakeIds) {
+        if (intakeIds.isEmpty()) {
+            return Map.of();
+        }
+        return noteLog.findByIntakeIdInOrderByCreatedAtAscIdAsc(intakeIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(IntakeNote::getIntakeId));
+    }
+
+    /** Adds one dated remark. Blank adds nothing; the log is append-only. */
+    private void addNote(long intakeId, String text, String actor) {
+        String clean = Normalizer.clean(text);
+        if (clean == null) {
+            return;
+        }
+        if (clean.length() > 1000) {
+            throw new FieldValidationException("notes", "A note can be at most 1000 characters.");
+        }
+        noteLog.saveAndFlush(new IntakeNote(intakeId, clean, actor));
+    }
+
+    private static final java.time.format.DateTimeFormatter NOTE_STAMP =
+            java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", java.util.Locale.ENGLISH);
+
+    /**
+     * The log as the single text a vehicle carries ({@code vehicles.notes}, 2000 characters):
+     * one dated line per remark. When it would not fit, the OLDEST lines are left out of the
+     * vehicle's copy rather than refusing the save — the full log stays on the intake.
+     */
+    static String vehicleNotesFrom(List<IntakeNote> notes, java.time.ZoneId zone) {
+        if (notes.isEmpty()) {
+            return null;
+        }
+        java.util.ArrayDeque<String> kept = new java.util.ArrayDeque<>();
+        int length = 0;
+        for (int i = notes.size() - 1; i >= 0; i--) {
+            IntakeNote n = notes.get(i);
+            String line = "[" + NOTE_STAMP.format(n.getCreatedAt().atZoneSameInstant(zone)) + "] "
+                    + n.getBody();
+            if (length + line.length() + 1 > 2000) {
+                break;
+            }
+            kept.addFirst(line);
+            length += line.length() + 1;
+        }
+        return kept.isEmpty() ? null : String.join("\n", kept);
     }
 
     public VehicleIntake get(long id) {
@@ -127,7 +191,8 @@ public class IntakeService {
                     ReviewStatus.COMPLETED, pageable);
             case DISCARDED -> intakes.findByReviewStatusOrderByCreatedAtDesc(
                     ReviewStatus.DISCARDED, pageable);
-            case ALL -> intakes.findAllByOrderByCreatedAtDesc(pageable);
+            case ALL -> intakes.findByReviewStatusOrderByCreatedAtDesc(
+                    ReviewStatus.PENDING, pageable);
         };
     }
 
@@ -166,7 +231,7 @@ public class IntakeService {
             case TO_CALL, WAITING, FAILED -> ReviewStatus.PENDING.name();
             case COMPLETED -> ReviewStatus.COMPLETED.name();
             case DISCARDED -> ReviewStatus.DISCARDED.name();
-            case ALL -> null;
+            case ALL -> ReviewStatus.PENDING.name();
         };
     }
 
@@ -215,7 +280,7 @@ public class IntakeService {
                     ReviewStatus.PENDING, List.of(ProcessingStatus.FAILED));
             case COMPLETED -> intakes.countByReviewStatus(ReviewStatus.COMPLETED);
             case DISCARDED -> intakes.countByReviewStatus(ReviewStatus.DISCARDED);
-            case ALL -> intakes.count();
+            case ALL -> intakes.countByReviewStatus(ReviewStatus.PENDING);
         };
     }
 
@@ -262,6 +327,13 @@ public class IntakeService {
             return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
                     location, latitude, longitude, null, null, null, null, null, null, null, null,
                     null);
+        }
+
+        /** As {@link #of}, plus the driver's name. */
+        public Report withDriverName(String driverName) {
+            return new Report(plate, mobile, company, reportedBy, reporterMobile, capturedAt,
+                    location, latitude, longitude, driverName, loadedStatus, bodyTypeId,
+                    materialType, noOfWheels, axleType, capacityId, companyMobile, places);
         }
 
         /** As {@link #of}, plus the company's own number. */
@@ -602,7 +674,8 @@ public class IntakeService {
                                  String company, String driverName, Long bodyTypeId,
                                  Long capacityId, List<Map<String, Object>> places,
                                  String companyMobile, Short axles, Short wheels,
-                                 BigDecimal lengthFt, Boolean verified, String notes) {
+                                 BigDecimal lengthFt, Boolean verified, Boolean callPending,
+                                 String notes) {
         VehicleIntake intake = get(id);
         if (intake.getReviewStatus() != ReviewStatus.PENDING) {
             throw new ApiException.Conflict("This intake was already "
@@ -620,7 +693,7 @@ public class IntakeService {
         List<String> cleanMobiles = null;
         if (mobiles != null) {
             cleanMobiles = mobiles.stream()
-                    .map(m -> m == null ? "" : m.replaceAll("[^0-9]", ""))
+                    .map(IntakeService::tidyMobile)
                     .filter(m -> !m.isEmpty())
                     .distinct()
                     .toList();
@@ -633,11 +706,11 @@ public class IntakeService {
         if (verified != null) {
             intake.setVerified(verified);
         }
-        if (notes != null) {
-            String clean = Normalizer.clean(notes);
-            VehicleService.requireNotesLength(clean);
-            intake.setNotes(clean);
+        if (callPending != null) {
+            intake.setCallPending(callPending);
         }
+        // A remark is ADDED to the log, dated; it never replaces an earlier one.
+        addNote(id, notes, actor);
         log.info("intake {} corrected by {}", id, actor);
         return intakes.saveAndFlush(intake);
     }
@@ -655,9 +728,26 @@ public class IntakeService {
         if (value == null) {
             return null;
         }
-        String digits = value.replaceAll("[^0-9]", "");
+        String digits = tidyMobile(value);
         if (digits.length() > 16) {
             throw new FieldValidationException("company_mobile", "That is too long for a phone number.");
+        }
+        return digits;
+    }
+
+    /**
+     * A number typed on the worklist, as digits. A +91 or leading-0 prefix is taken off, so
+     * "+91 98765 43210" is stored as 9876543210 exactly as it would have been at upload.
+     * Deliberately lenient otherwise: a half-heard number is kept as typed rather than refused,
+     * and is validated when the vehicle is created. Blank gives "".
+     */
+    static String tidyMobile(String raw) {
+        String digits = raw == null ? "" : raw.replaceAll("[^0-9]", "");
+        if (digits.length() == 12 && digits.startsWith("91")) {
+            return digits.substring(2);
+        }
+        if (digits.length() == 11 && digits.startsWith("0")) {
+            return digits.substring(1);
         }
         return digits;
     }
@@ -704,13 +794,12 @@ public class IntakeService {
             });
         }
 
-        // The form's notes win; without any, whatever was saved on the row while working it.
+        // A remark typed on the completion form joins the log first; the vehicle then carries the
+        // whole log as dated lines.
+        addNote(id, notes, actor);
         Vehicle vehicle = vehicleService.intake(canonical, bodyTypeId, contacts,
                 axles, wheels, capacity, lengthFt, places == null ? List.of() : places,
-                notes != null ? notes : intake.getNotes());
-        if (notes != null) {
-            intake.setNotes(Normalizer.clean(notes));
-        }
+                vehicleNotesFrom(notesOf(id), java.time.ZoneId.systemDefault()));
         // The form's tick wins; without one, whatever was saved on the row while working it.
         if (verified != null) {
             intake.setVerified(verified);

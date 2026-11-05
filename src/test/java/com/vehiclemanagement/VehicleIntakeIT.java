@@ -47,13 +47,13 @@ class VehicleIntakeIT extends ApiTest {
     }
 
     @Test
-    @DisplayName("the driver's name is optional: the mobile identifies them, and is their name until known")
+    @DisplayName("the driver's name is optional: the mobile identifies them, and they are Unknown driver until the name is known")
     void a_blank_driver_name_is_filed_under_the_mobile() {
         ResponseEntity<JsonNode> created = intake("MH12AB4321", "", "9811008777", "Kumar Roadways");
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         JsonNode drivers = get("/api/vehicles/" + idOf(created) + "/drivers", token).getBody();
         assertThat(drivers).hasSize(1);
-        assertThat(drivers.get(0).get("name").asText()).isEqualTo("9811008777");
+        assertThat(drivers.get(0).get("name").asText()).isEqualTo("Unknown driver");
 
         // An existing driver found by the same number keeps the name already on file.
         ResponseEntity<JsonNode> again = intake("MH12AB4322", null, "9811008777", "Kumar Roadways");

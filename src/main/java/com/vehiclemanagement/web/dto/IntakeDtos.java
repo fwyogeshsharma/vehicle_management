@@ -65,8 +65,10 @@ public final class IntakeDtos {
                           Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
                           /** The CSR has confirmed the details; copied to the vehicle on completion. */
                           boolean verified,
-                          /** The CSR's remarks; copied onto the vehicle on completion. */
-                          String notes,
+                          /** The CSR still has to ring the driver. */
+                          boolean callPending,
+                          /** The CSR's remarks, oldest first. Each is dated and never edited. */
+                          List<Note> noteLog,
                           short attempts, String processingError,
                           Long vehicleId, String reviewedBy, String reviewNote,
                           OffsetDateTime capturedAt, OffsetDateTime createdAt,
@@ -77,6 +79,11 @@ public final class IntakeDtos {
         }
 
         public static Summary from(VehicleIntake i, String uploadedByName) {
+            return from(i, uploadedByName, List.of());
+        }
+
+        public static Summary from(VehicleIntake i, String uploadedByName,
+                                   List<com.vehiclemanagement.domain.IntakeNote> notes) {
             return new Summary(i.getId(),
                     i.getProcessingStatus(), i.getReviewStatus(), i.getImageKeys().size(),
                     i.getReportedPlate(), i.getReportedMobile(), i.getReportedCompany(),
@@ -92,10 +99,19 @@ public final class IntakeDtos {
                     i.plate(), i.mobiles(), i.company(), i.driverName(), i.companyMobile(),
                     i.getBodyTypeId(), i.getCapacityId(),
                     i.noOfAxles(), i.noOfWheels(), i.lengthFt(),
-                    i.isVerified(), i.getNotes(),
+                    i.isVerified(), i.isCallPending(),
+                    notes.stream().map(Note::from).toList(),
                     i.getAttempts(), i.getProcessingError(),
                     i.getVehicleId(), i.getReviewedBy(), i.getReviewNote(),
                     i.getCapturedAt(), i.getCreatedAt(), i.getProcessedAt());
+        }
+    }
+
+    /** One dated remark. Read-only: remarks are added, never changed. */
+    public record Note(Long id, String text, String createdBy, OffsetDateTime createdAt) {
+
+        public static Note from(com.vehiclemanagement.domain.IntakeNote n) {
+            return new Note(n.getId(), n.getBody(), n.getCreatedBy(), n.getCreatedAt());
         }
     }
 
@@ -108,6 +124,11 @@ public final class IntakeDtos {
 
         public static Detail from(VehicleIntake i, String uploadedByName) {
             return new Detail(Summary.from(i, uploadedByName), i.getOcrRaw());
+        }
+
+        public static Detail from(VehicleIntake i, String uploadedByName,
+                                  List<com.vehiclemanagement.domain.IntakeNote> notes) {
+            return new Detail(Summary.from(i, uploadedByName, notes), i.getOcrRaw());
         }
     }
 
@@ -169,7 +190,9 @@ public final class IntakeDtos {
                                  Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
                                  /** Null leaves it as it was. */
                                  Boolean verified,
-                                 /** Null leaves them; "" clears them. */
+                                 /** Null leaves it as it was. */
+                                 Boolean callPending,
+                                 /** A NEW remark to add to the log; null or blank adds nothing. */
                                  String notes) {
     }
 
