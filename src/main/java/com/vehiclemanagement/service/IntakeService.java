@@ -799,7 +799,9 @@ public class IntakeService {
         addNote(id, notes, actor);
         Vehicle vehicle = vehicleService.intake(canonical, bodyTypeId, contacts,
                 axles, wheels, capacity, lengthFt, places == null ? List.of() : places,
-                vehicleNotesFrom(notesOf(id), java.time.ZoneId.systemDefault()));
+                vehicleNotesFrom(notesOf(id), java.time.ZoneId.systemDefault()),
+                // The desk often lacks the capacity on the first call.
+                false);
         // The form's tick wins; without one, whatever was saved on the row while working it.
         if (verified != null) {
             intake.setVerified(verified);

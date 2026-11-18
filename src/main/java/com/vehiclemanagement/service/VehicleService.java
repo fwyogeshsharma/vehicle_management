@@ -392,10 +392,20 @@ public class VehicleService {
     public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
                           Short axles, Short wheels, String capacity, BigDecimal lengthFt,
                           List<CityRef> places, String notes) {
-        // Only this path (a completed photo intake) may leave the capacity blank: the desk often
-        // does not have it on the first call.
+        return intake(registrationNumber, bodyTypeId, contacts,
+                axles, wheels, capacity, lengthFt, places, notes, true);
+    }
+
+    /**
+     * As above. {@code capacityRequired} is false only for a completed photo intake, where the
+     * desk often does not have the capacity on the first call.
+     */
+    @Transactional
+    public Vehicle intake(String registrationNumber, Long bodyTypeId, Contacts contacts,
+                          Short axles, Short wheels, String capacity, BigDecimal lengthFt,
+                          List<CityRef> places, String notes, boolean capacityRequired) {
         return annotate(intake(registrationNumber, bodyTypeId, contacts,
-                axles, wheels, capacity, lengthFt, places, false), notes);
+                axles, wheels, capacity, lengthFt, places, capacityRequired), notes);
     }
 
     /** Same transaction as the create, so a refused note leaves no vehicle behind. */

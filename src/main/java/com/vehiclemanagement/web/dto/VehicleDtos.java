@@ -46,7 +46,9 @@ public final class VehicleDtos {
                           /** users.id of who registered it; null for older or seeded rows. */
                           Long addedBy,
                           /** That account's current name, for display. */
-                          String addedByName) {
+                          String addedByName,
+                          /** When the row was created; for a photo intake, when it became a vehicle. */
+                          OffsetDateTime createdAt) {
 
         public static Summary from(Vehicle v) {
             return from(v, null, null);
@@ -73,7 +75,7 @@ public final class VehicleDtos {
                     v.getNoOfAxles(), v.getNoOfWheels(), v.getLengthFt(),
                     places == null ? null : places.getSummary(),
                     places == null ? 0 : places.getTotal(),
-                    v.getAddedBy(), addedByName);
+                    v.getAddedBy(), addedByName, v.getCreatedAt());
         }
     }
 

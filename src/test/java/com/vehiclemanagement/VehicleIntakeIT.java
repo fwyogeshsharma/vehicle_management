@@ -47,6 +47,14 @@ class VehicleIntakeIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("the desk's register route still requires a capacity")
+    void the_desk_route_still_requires_capacity() {
+        ResponseEntity<JsonNode> r = post("/api/vehicles/intake", token, body(
+                "driver_name", "No Cap", "driver_mobile", "9811008666"));
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     @DisplayName("the driver's name is optional: the mobile identifies them, and they are Unknown driver until the name is known")
     void a_blank_driver_name_is_filed_under_the_mobile() {
         ResponseEntity<JsonNode> created = intake("MH12AB4321", "", "9811008777", "Kumar Roadways");
