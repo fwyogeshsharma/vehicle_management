@@ -54,6 +54,57 @@ public interface VehicleIntakeRepository extends JpaRepository<VehicleIntake, Lo
 
     long countByReviewStatus(ReviewStatus reviewStatus);
 
+    /** One uploader with how many entries they have added. */
+    interface UploaderTotal {
+        Long getUserId();
+
+        String getName();
+
+        long getTotal();
+    }
+
+    /** One calendar day and how many entries were added on it. */
+    interface DayCount {
+        java.sql.Date getDay();
+
+        long getTotal();
+    }
+
+    /**
+     * Everyone who has added at least one entry, with their running total.
+     *
+     * <p>A discarded entry is deleted outright, so it is not counted: the totals are what is
+     * still on the system, not a log of everything ever sent.
+     */
+    @Query(value = """
+            SELECT u.id AS "userId", u.name AS "name", count(*) AS "total"
+              FROM vehicle_intake i JOIN users u ON u.id = i.uploaded_by
+             GROUP BY u.id, u.name
+             ORDER BY lower(u.name), u.id
+            """, nativeQuery = true)
+    java.util.List<UploaderTotal> uploaderTotals();
+
+    /** Entries per calendar day for one uploader, newest day first, days cut in {@code tz}. */
+    @Query(value = """
+            SELECT CAST((i.created_at AT TIME ZONE CAST(:tz AS TEXT)) AS date) AS "day",
+                   count(*) AS "total"
+              FROM vehicle_intake i
+             WHERE i.uploaded_by = :userId
+             GROUP BY 1
+             ORDER BY 1 DESC
+            """, nativeQuery = true)
+    java.util.List<DayCount> dailyCounts(@Param("userId") long userId, @Param("tz") String tz);
+
+    /** Every entry one uploader added on one calendar day (cut in {@code tz}), newest first. */
+    @Query(value = """
+            SELECT i.* FROM vehicle_intake i
+             WHERE i.uploaded_by = :userId
+               AND CAST((i.created_at AT TIME ZONE CAST(:tz AS TEXT)) AS date) = CAST(:day AS date)
+             ORDER BY i.created_at DESC, i.id DESC
+            """, nativeQuery = true)
+    java.util.List<VehicleIntake> entriesOn(@Param("userId") long userId,
+                                            @Param("day") String day, @Param("tz") String tz);
+
     /**
      * The worklist, filtered by registration number and/or location.
      *

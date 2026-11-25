@@ -208,4 +208,16 @@ public final class IntakeDtos {
     public record Counts(long toCall, long waiting, long failed,
                          long completed, long discarded, long all) {
     }
+
+    /** Someone who has added entries, and how many. */
+    public record Uploader(Long userId, String name, long total) {
+    }
+
+    /** Entries added on one calendar day. */
+    public record Day(java.time.LocalDate date, long count) {
+    }
+
+    /** One uploader's entries per day, newest first, with the overall total. */
+    public record DailyCounts(long total, List<Day> days) {
+    }
 }

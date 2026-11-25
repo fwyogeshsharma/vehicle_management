@@ -134,6 +134,37 @@ public class IntakeService {
                 .collect(java.util.stream.Collectors.groupingBy(IntakeNote::getIntakeId));
     }
 
+    // -- who added how many (admin report) ------------------------------------------
+
+    /** Days are cut in this zone unless the caller names one; the desk works on Indian time. */
+    private static final String REPORT_ZONE = "Asia/Kolkata";
+
+    private static String reportZone(String tz) {
+        if (tz == null || tz.isBlank()) {
+            return REPORT_ZONE;
+        }
+        try {
+            return java.time.ZoneId.of(tz.trim()).getId();
+        } catch (RuntimeException e) {
+            throw new FieldValidationException("tz", "Not a time zone, e.g. Asia/Kolkata.");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<VehicleIntakeRepository.UploaderTotal> uploaders() {
+        return intakes.uploaderTotals();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VehicleIntakeRepository.DayCount> dailyCounts(long userId, String tz) {
+        return intakes.dailyCounts(userId, reportZone(tz));
+    }
+
+    @Transactional(readOnly = true)
+    public List<VehicleIntake> entriesOn(long userId, java.time.LocalDate day, String tz) {
+        return intakes.entriesOn(userId, day.toString(), reportZone(tz));
+    }
+
     /** Adds one dated remark. Blank adds nothing; the log is append-only. */
     private void addNote(long intakeId, String text, String actor) {
         String clean = Normalizer.clean(text);
