@@ -1,5 +1,7 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Size;
 import com.vehiclemanagement.domain.BodyType;
 import com.vehiclemanagement.domain.City;
 import com.vehiclemanagement.domain.State;
@@ -57,14 +59,14 @@ public final class GeoDtos {
         }
     }
 
-    public record CapacityRequest(@NotBlank String label,
-                                  @NotNull java.math.BigDecimal tons) {
+    public record CapacityRequest(@NotBlank @Size(max = 32) String label,
+                                  @NotNull @DecimalMax("9999.99") java.math.BigDecimal tons) {
     }
 
     /** A place the 3,285-row seed did not contain. Always added under a named state. */
-    public record CityRequest(@NotBlank String name) {
+    public record CityRequest(@NotBlank @Size(max = 100) String name) {
     }
 
-    public record BodyTypeRequest(@NotBlank String name) {
+    public record BodyTypeRequest(@NotBlank @Size(max = 80) String name) {
     }
 }

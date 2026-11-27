@@ -101,6 +101,61 @@ class UploadLinkIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("an entry needs a photo or a mobile number; a refused one is not stored")
+    void an_entry_with_nothing_to_work_from_is_refused() {
+        String token = issue(fieldUserId);
+
+        for (ResponseEntity<JsonNode> refused : java.util.List.of(
+                send(token, 0),
+                send(token, 0, "reported_plate", "MH12AB1234", "owner", "Suresh"),
+                send(token, 0, "reported_mobile", "   "),
+                send(token, 0, "reported_mobile", "call later"),
+                send(token, 0, "reported_mobile", "12345"),
+                send(token, 0, "reported_mobile", "982220000"),
+                send(token, 1, "reported_mobile", "98222000021"),
+                send(token, 0, "reported_mobile", "1234567890"),
+                send(token, 1, "reported_mobile", "5822200002"),
+                send(token, 0, "reported_mobile", "+91 12345 67890"),
+                send(token, 1, "reported_mobile", "9822200002 / 9822200003"))) {
+            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(refused.getBody().toString()).contains("reported_mobile");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM vehicle_intake", Integer.class))
+                .isZero();
+
+        assertThat(send(token, 1).getStatusCode()).as("a photo alone")
+                .isEqualTo(HttpStatus.ACCEPTED);
+        for (String typed : java.util.List.of("+91 98222 00002", "098222-00002")) {
+            ResponseEntity<JsonNode> ok = send(token, 0, "reported_mobile", typed);
+            assertThat(ok.getStatusCode()).as(typed).isEqualTo(HttpStatus.ACCEPTED);
+            assertThat(jdbc.queryForObject("SELECT reported_mobile FROM vehicle_intake WHERE id = ?",
+                    String.class, ok.getBody().get("id").asLong())).isEqualTo("9822200002");
+        }
+    }
+
+    @Test
+    @DisplayName("a plate or name the desk could not use is refused, naming the field and value")
+    void typed_fields_are_checked() {
+        String token = issue(fieldUserId);
+
+        ResponseEntity<JsonNode> plate = send(token, 0, "reported_mobile", "9822200002",
+                "reported_plate", "ABC");
+        assertThat(plate.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(plate.getBody().toString()).contains("Registration number")
+                .contains("ABC").contains("MH12AB1234");
+
+        ResponseEntity<JsonNode> name = send(token, 0, "reported_mobile", "9822200002",
+                "owner", "x".repeat(121));
+        assertThat(name.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(name.getBody().toString()).contains("Driver / owner name").contains("At most 120");
+
+        assertThat(send(token, 0, "reported_mobile", "12345").getBody().toString())
+                .contains("Mobile number").contains("12345");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM vehicle_intake", Integer.class))
+                .isZero();
+    }
+
+    @Test
     @DisplayName("owner, capacity and several places are kept, and none of them is required")
     void owner_capacity_and_places_are_saved() {
         String token = issue(fieldUserId);
@@ -119,6 +174,7 @@ class UploadLinkIT extends ApiTest {
                 + "{\"state_id\":" + stateId + ",\"city_id\":null}]";
 
         ResponseEntity<JsonNode> sent = send(token, 0, "owner", "Kumar Roadways",
+                "reported_mobile", "9822200002",
                 "capacity_id", String.valueOf(nine), "places", places);
 
         assertThat(sent.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
@@ -132,10 +188,9 @@ class UploadLinkIT extends ApiTest {
         assertThat(row.get("capacity_id")).isEqualTo(nine);
         assertThat(row.get("n")).isEqualTo(2);
 
-        // Nothing at all is also accepted.
-        assertThat(send(token, 0).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         // An unknown capacity id costs that field, not the entry.
-        ResponseEntity<JsonNode> bad = send(token, 0, "capacity_id", "999999");
+        ResponseEntity<JsonNode> bad = send(token, 0, "reported_mobile", "9822200002",
+                "capacity_id", "999999");
         assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(jdbc.queryForObject("SELECT capacity_id FROM vehicle_intake WHERE id = ?",
                 Long.class, bad.getBody().get("id").asLong())).isNull();
@@ -163,7 +218,7 @@ class UploadLinkIT extends ApiTest {
     void the_request_cannot_choose_who_it_is_from() {
         ResponseEntity<JsonNode> sent = send(issue(fieldUserId), 0,
                 "reported_by", "Someone Else", "reporter_mobile", "9999999999",
-                "reported_plate", "MH12AB1234");
+                "reported_mobile", "9822200002");
 
         Map<String, Object> row = row(sent.getBody().get("id").asLong());
         assertThat(row.get("reported_by")).isEqualTo("Ramesh Field");
@@ -173,7 +228,7 @@ class UploadLinkIT extends ApiTest {
     @Test
     @DisplayName("the worklist shows who sent it")
     void the_worklist_names_the_sender() {
-        long id = send(issue(fieldUserId), 0, "reported_plate", "MH12AB1234")
+        long id = send(issue(fieldUserId), 0, "reported_mobile", "9822200002")
                 .getBody().get("id").asLong();
 
         JsonNode item = get("/api/intake/" + id, admin).getBody();
@@ -205,9 +260,9 @@ class UploadLinkIT extends ApiTest {
         String first = issue(fieldUserId);
         String second = issue(fieldUserId);
 
-        assertThat(send(first, 0, "reported_plate", "MH12AB1234").getStatusCode())
+        assertThat(send(first, 0, "reported_mobile", "9822200002").getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(send(second, 0, "reported_plate", "MH12AB1234").getStatusCode())
+        assertThat(send(second, 0, "reported_mobile", "9822200002").getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
     }
 
@@ -218,7 +273,7 @@ class UploadLinkIT extends ApiTest {
         assertThat(delete("/api/users/" + fieldUserId + "/upload-link", admin).getStatusCode())
                 .isEqualTo(HttpStatus.NO_CONTENT);
 
-        assertThat(send(token, 0, "reported_plate", "MH12AB1234").getStatusCode())
+        assertThat(send(token, 0, "reported_mobile", "9822200002").getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/users/" + fieldUserId + "/upload-link", admin)
                 .getBody().get("exists").asBoolean()).isFalse();
@@ -231,14 +286,14 @@ class UploadLinkIT extends ApiTest {
         assertThat(delete("/api/users/" + fieldUserId, admin).getStatusCode())
                 .isEqualTo(HttpStatus.NO_CONTENT);
 
-        assertThat(send(token, 0, "reported_plate", "MH12AB1234").getStatusCode())
+        assertThat(send(token, 0, "reported_mobile", "9822200002").getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(post("/api/users/" + fieldUserId + "/upload-link", admin, null)
                 .getStatusCode()).as("cannot issue to a deactivated account")
                 .isEqualTo(HttpStatus.CONFLICT);
 
         post("/api/users/" + fieldUserId + "/restore", admin, null);
-        assertThat(send(token, 0, "reported_plate", "MH12AB1234").getStatusCode())
+        assertThat(send(token, 0, "reported_mobile", "9822200002").getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
     }
 
@@ -246,7 +301,7 @@ class UploadLinkIT extends ApiTest {
     @DisplayName("status reports use but never the token; only an administrator can manage links")
     void management_is_admin_only_and_never_reveals_the_token() {
         String token = issue(fieldUserId);
-        send(token, 0, "reported_plate", "MH12AB1234");
+        send(token, 0, "reported_mobile", "9822200002");
 
         JsonNode status = get("/api/users/" + fieldUserId + "/upload-link", admin).getBody();
         assertThat(status.get("exists").asBoolean()).isTrue();

@@ -1,5 +1,8 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 import com.vehiclemanagement.domain.Company;
 import com.vehiclemanagement.repo.CompanyRepository;
 import com.vehiclemanagement.domain.CompanyLocation;
@@ -53,11 +56,16 @@ public final class CompanyDtos {
      * @param places where it operates, optional. Every vehicle it owns inherits these, so a
      *               company created without any serves nowhere until they are set.
      */
-    public record CreateRequest(@NotBlank String name, List<VehicleDtos.Place> places) {
+    public record CreateRequest(@NotBlank @Size(max = 160) String name,
+                                List<VehicleDtos.@Valid Place> places) {
     }
 
-    public record UpdateRequest(@NotBlank String name, String mobile, String email, String gstin,
-                                String address, Long headOfficeCityId) {
+    public record UpdateRequest(@NotBlank @Size(max = 160) String name,
+                                String mobile,
+                                @Email @Size(max = 255) String email,
+                                @Size(max = 15) String gstin,
+                                @Size(max = 300) String address,
+                                Long headOfficeCityId) {
     }
 
     /** A state, optionally narrowed to one city. A null city means the whole state. */
@@ -74,7 +82,7 @@ public final class CompanyDtos {
      * <p>An empty list means the company serves <b>nowhere</b> — its vehicles then match no
      * city. That is the documented rule, not a fallback to the vehicles' own preferences.
      */
-    public record LocationsRequest(@NotNull List<VehicleDtos.Place> places) {
+    public record LocationsRequest(@NotNull List<VehicleDtos.@Valid Place> places) {
     }
 
     public record Member(Long userId, String name, String mobile, String userType,

@@ -19,9 +19,8 @@ import java.util.List;
 /**
  * Who has added how many intake entries, and on which days. Administrators only.
  *
- * <p>Counts what is still in {@code vehicle_intake}: a discarded entry is deleted outright, so it
- * is not here to count. Days are calendar days in the caller's time zone ({@code tz}, defaulting
- * to Asia/Kolkata), so "today" on the screen is today for the person reading it.
+ * <p>Counts every row in {@code vehicle_intake}, whatever its review status: an entry deleted
+ * from the worklist is only marked DISCARDED, so it is still listed and counted here.
  */
 @RestController
 @RequestMapping("/api/intake/activity")

@@ -81,6 +81,10 @@ public final class ConstraintErrors {
             // true when a truck gained the right to its own locations alongside its company's.
             Map.entry("fk_vxl_vehicle", new Mapping(
                     "That vehicle no longer exists.", null)),
+            Map.entry("fk_vxl_state", new Mapping(
+                    "That state does not exist.", "state_id")),
+            Map.entry("fk_cxl_state", new Mapping(
+                    "That state does not exist.", "state_id")),
             Map.entry("fk_vxl_city_in_state", new Mapping(
                     "That city is not in the state you named.", "city_id")),
             Map.entry("fk_cxl_city_in_state", new Mapping(
@@ -107,6 +111,8 @@ public final class ConstraintErrors {
             Map.entry("ck_companies_mobile", new Mapping(
                     "Enter a valid 10-digit Indian mobile number (starting with 6-9).", "mobile")),
             Map.entry("ck_companies_gstin", new Mapping(
+                    "That does not look like a GSTIN, e.g. 27AAPFU0939F1ZV.", "gstin")),
+            Map.entry("ck_consignors_gstin", new Mapping(
                     "That does not look like a GSTIN, e.g. 27AAPFU0939F1ZV.", "gstin")));
 
     private ConstraintErrors() {

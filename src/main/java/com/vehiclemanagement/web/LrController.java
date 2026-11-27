@@ -170,7 +170,7 @@ public class LrController {
                     + "continuous and the customer holds a copy.")
     @PostMapping("/{id}/cancel")
     public LrDtos.Detail cancel(@PathVariable long id,
-                                @RequestBody(required = false) LrDtos.CancelRequest request) {
+                                @Valid @RequestBody(required = false) LrDtos.CancelRequest request) {
         return LrDtos.Detail.from(lrs.cancel(id, request == null ? null : request.reason()));
     }
 }

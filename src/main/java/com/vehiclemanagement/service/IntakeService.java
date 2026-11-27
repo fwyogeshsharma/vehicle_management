@@ -24,8 +24,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -531,6 +529,27 @@ public class IntakeService {
     }
 
     /**
+     * The upload link's minimum: a photo to look at or a number to ring. Without either the desk
+     * has an entry it can do nothing with.
+     *
+     * <p>A number, when typed, must pass the same {@link Normalizer#mobile} rule that creating a
+     * vehicle applies (10 digits starting 6-9, after any +91 or leading 0), with or without
+     * photos: the sender is still on the form and can fix it.
+     *
+     * @return the 10 digits to store, or null when no number was typed
+     */
+    public String requireSomethingToWorkFrom(List<MultipartFile> files, String mobile) {
+        boolean typed = mobile != null && !mobile.isBlank();
+        String digits = Normalizer.optionalMobile(mobile, "reported_mobile");
+        boolean hasPhoto = files != null && files.stream().anyMatch(f -> !f.isEmpty());
+        if (!typed && !hasPhoto) {
+            throw new FieldValidationException("reported_mobile",
+                    "Add a photo or a mobile number before sending.");
+        }
+        return digits;
+    }
+
+    /**
      * The reporter's number, canonical where possible and verbatim where not.
      *
      * <p><b>This never throws.</b> {@link Normalizer#mobile} does, and using it here meant a
@@ -847,55 +866,23 @@ public class IntakeService {
     }
 
     /**
-     * Throw an intake away: the row <b>and its photos</b>, permanently.
+     * Take an intake off the worklist. <b>A soft delete</b>: the row is marked DISCARDED and
+     * kept, with its photos, its remarks, who removed it and why.
      *
-     * <p>Discarding used to mark the row DISCARDED and keep everything. It now deletes, because
-     * a discarded report is one nobody wants back (not a truck, unreadable, or a duplicate) and
-     * keeping its photos only cost storage. The log line below is the only trace left.
+     * <p>It leaves every worklist tab, and stays in the administrator's "entries by user" report,
+     * so deleting an entry cannot lower the count of what a person sent in.
      *
-     * <p>Only an unreviewed row: a COMPLETED one is the provenance of a vehicle, and stays.
-     *
-     * <p><b>The photos go after the commit, not before.</b> Deleted first, a rollback would
-     * leave a live row whose photos are gone. Deleted after, a failure leaves orphan objects,
-     * which cost storage and nothing else: the same trade {@link #upload} makes in reverse.
-     *
-     * <p>Safe against the OCR worker: its writes are {@code UPDATE ... WHERE id = ?}, so a row
-     * deleted while it reads simply updates nothing.
+     * <p>Only an unreviewed row: a COMPLETED one is the provenance of a vehicle, and stays as it
+     * is.
      */
     @Transactional
     public void discard(long id, String actor, String reason) {
         VehicleIntake intake = get(id);
         requireUnreviewed(intake, "discard");
-        List<String> keys = List.copyOf(intake.getImageKeys());
-        intakes.delete(intake);
-        intakes.flush();
         String why = Normalizer.clean(reason);
-        log.info("intake {} DELETED by {} with {} photo(s){}", id, actor, keys.size(),
-                why == null ? "" : ": " + why);
-        afterCommit(() -> {
-            for (String key : keys) {
-                try {
-                    images.delete(key);
-                } catch (RuntimeException e) {
-                    log.warn("intake {}: photo {} could not be deleted and is now orphaned",
-                            id, key, e);
-                }
-            }
-        });
-    }
-
-    /** Run once the surrounding transaction commits; immediately when there is none. */
-    private static void afterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
+        intake.discard(actor, why);
+        intakes.saveAndFlush(intake);
+        log.info("intake {} DISCARDED by {}{}", id, actor, why == null ? "" : ": " + why);
     }
 
     /**
@@ -937,8 +924,8 @@ public class IntakeService {
                     "This intake was already completed as vehicle " + intake.getVehicleId() + ".");
         }
         if (intake.getReviewStatus() == ReviewStatus.DISCARDED) {
-            throw new ApiException.Conflict(
-                    "This intake was discarded; it cannot be " + verb + "d.");
+            throw new ApiException.Conflict("This intake was deleted; it cannot be "
+                    + (verb.endsWith("e") ? verb + "d." : verb + "ed."));
         }
     }
 }

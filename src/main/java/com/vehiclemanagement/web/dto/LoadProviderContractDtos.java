@@ -1,5 +1,6 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.constraints.DecimalMax;
 import com.vehiclemanagement.domain.LoadProviderContract;
 import com.vehiclemanagement.service.LoadProviderContractService;
 import jakarta.validation.constraints.Size;
@@ -17,14 +18,14 @@ public final class LoadProviderContractDtos {
     public record SaveRequest(Long consignorId,
                               Long cityId,
                               @Size(max = 160) String location,
-                              BigDecimal priceApproved,
-                              BigDecimal loadingCharges,
-                              BigDecimal unloadingCharges,
+                              @DecimalMax("9999999999.99") BigDecimal priceApproved,
+                              @DecimalMax("9999999999.99") BigDecimal loadingCharges,
+                              @DecimalMax("9999999999.99") BigDecimal unloadingCharges,
                               BigDecimal commissionPercentage,
-                              BigDecimal munshiana,
-                              BigDecimal dala,
-                              BigDecimal finalPriceForTruck,
-                              BigDecimal perTonnePrice,
+                              @DecimalMax("9999999999.99") BigDecimal munshiana,
+                              @DecimalMax("9999999999.99") BigDecimal dala,
+                              @DecimalMax("9999999999.99") BigDecimal finalPriceForTruck,
+                              @DecimalMax("9999999999.99") BigDecimal perTonnePrice,
                               @Size(max = 2000) String notes) {
 
         public LoadProviderContractService.Request toRequest() {

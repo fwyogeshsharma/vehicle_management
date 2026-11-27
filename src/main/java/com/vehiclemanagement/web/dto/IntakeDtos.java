@@ -1,5 +1,8 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Size;
 import com.vehiclemanagement.domain.ProcessingStatus;
 import com.vehiclemanagement.domain.ReviewStatus;
 import com.vehiclemanagement.domain.VehicleIntake;
@@ -147,7 +150,7 @@ public final class IntakeDtos {
                                   String registrationNumber,
                                   /** Optional: null means "not known yet". */
                                   Long bodyTypeId,
-                                  String driverName,
+                                  @Size(max = 120) String driverName,
                                   @NotBlank String driverMobile,
                                   /**
                                    * A second way to reach the same driver. A truck's side often
@@ -156,17 +159,17 @@ public final class IntakeDtos {
                                    * driver's. Optional, and never used to look anyone up.
                                    */
                                   String driverAltMobile,
-                                  String companyName,
+                                  @Size(max = 160) String companyName,
                                   /** The transport office's number, stored on the company. */
                                   String companyMobile,
                                   Short noOfAxles,
                                   Short noOfWheels,
                                   /** Free text. Ignored when {@code capacityId} is given. */
-                                  String capacity,
+                                  @Size(max = 32) String capacity,
                                   /** A pick-list entry; stored on the vehicle as its label. */
                                   Long capacityId,
-                                  BigDecimal lengthFt,
-                                  List<VehicleDtos.Place> places,
+                                  @DecimalMax("999.99") BigDecimal lengthFt,
+                                  List<VehicleDtos.@Valid Place> places,
                                   /** Null falls back to the tick saved on the intake row. */
                                   Boolean verified,
                                   /** Remarks for the vehicle. Null falls back to the row's notes. */
@@ -180,20 +183,20 @@ public final class IntakeDtos {
      * was. An empty string or an empty list is a deliberate clearing. Without that distinction a
      * request that only fixes the company would silently wipe the plate.
      */
-    public record CorrectRequest(String plate, List<String> mobiles, String company,
+    public record CorrectRequest(@Size(max = 32) String plate, List<String> mobiles, @Size(max = 160) String company,
                                  /** The company's own number; "" clears it. Separate from mobiles. */
                                  String companyMobile,
-                                 String driverName, Long bodyTypeId, Long capacityId,
+                                 @Size(max = 120) String driverName, Long bodyTypeId, Long capacityId,
                                  /** [{state_id, city_id|null}] — a null city is the whole state. */
                                  List<Map<String, Object>> places,
                                  /** As body_type_id: null leaves it, 0 clears it. */
-                                 Short noOfAxles, Short noOfWheels, BigDecimal lengthFt,
+                                 Short noOfAxles, Short noOfWheels, @DecimalMax("999.99") BigDecimal lengthFt,
                                  /** Null leaves it as it was. */
                                  Boolean verified,
                                  /** Null leaves it as it was. */
                                  Boolean callPending,
                                  /** A NEW remark to add to the log; null or blank adds nothing. */
-                                 String notes) {
+                                 @Size(max = 1000) String notes) {
     }
 
     public record DiscardRequest(String reason) {

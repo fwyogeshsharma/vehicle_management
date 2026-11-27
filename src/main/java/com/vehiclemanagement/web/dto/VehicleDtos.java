@@ -1,5 +1,8 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Size;
 import com.vehiclemanagement.domain.Vehicle;
 import com.vehiclemanagement.repo.VehicleRepository;
 import com.vehiclemanagement.service.VehicleService;
@@ -117,18 +120,18 @@ public final class VehicleDtos {
                                 Short noOfAxles,
                                 Short noOfWheels,
                                 /** Free text. Ignored when {@code capacityId} is given. */
-                                String capacity,
+                                @Size(max = 32) String capacity,
                                 /** A pick-list entry; stored on the vehicle as its label. */
                                 Long capacityId,
-                                BigDecimal lengthFt,
+                                @DecimalMax("999.99") BigDecimal lengthFt,
                                 /**
                                  * Where it runs. Only for a person-owned vehicle — a company's
                                  * truck inherits its company's, and sending places for one is a
                                  * 422 rather than a silent no-op.
                                  */
-                                List<Place> places,
+                                List<@Valid Place> places,
                                 /** Free-text remarks. Optional. */
-                                String notes) {
+                                @Size(max = 2000) String notes) {
     }
 
     /**
@@ -144,31 +147,31 @@ public final class VehicleDtos {
                                 String registrationNumber,
                                 /** Optional: null means "not known yet". */
                                 Long bodyTypeId,
-                                String driverName,
+                                @Size(max = 120) String driverName,
                                 @NotBlank String driverMobile,
                                 /**
                                  * A second way to reach the same driver. Optional, and never
                                  * used to look anyone up — the main number is the identity.
                                  */
                                 String driverAltMobile,
-                                String companyName,
+                                @Size(max = 160) String companyName,
                                 /** The office number, stored on the company. Optional. */
                                 String companyMobile,
                                 Short noOfAxles,
                                 Short noOfWheels,
                                 /** Free text. Ignored when {@code capacityId} is given. */
-                                String capacity,
+                                @Size(max = 32) String capacity,
                                 /** A pick-list entry; stored on the vehicle as its label. */
                                 Long capacityId,
-                                BigDecimal lengthFt,
+                                @DecimalMax("999.99") BigDecimal lengthFt,
                                 /**
                                  * Where it runs. With a company name these become the
                                  * <b>company's</b> locations, which all its trucks inherit;
                                  * without one they are the vehicle's own.
                                  */
-                                List<Place> places,
+                                List<@Valid Place> places,
                                 /** Free-text remarks. Optional. */
-                                String notes) {
+                                @Size(max = 2000) String notes) {
     }
 
     /** The truck's own attributes. Owner and drivers have their own endpoints. */
@@ -183,11 +186,11 @@ public final class VehicleDtos {
                                 Short noOfAxles,
                                 Short noOfWheels,
                                 /** Free text. Ignored when {@code capacityId} is given. */
-                                String capacity,
+                                @Size(max = 32) String capacity,
                                 /** A pick-list entry; stored on the vehicle as its label. */
                                 Long capacityId,
-                                BigDecimal lengthFt,
-                                String notes,
+                                @DecimalMax("999.99") BigDecimal lengthFt,
+                                @Size(max = 2000) String notes,
                                 /** Optional: null leaves it as it is, for callers that predate it. */
                                 Boolean verified) {
     }
@@ -237,11 +240,11 @@ public final class VehicleDtos {
     }
 
     /** Replaces the whole set. An empty list clears it. */
-    public record LocationsRequest(@NotNull List<Place> places) {
+    public record LocationsRequest(@NotNull List<@Valid Place> places) {
     }
 
     /** A state, and optionally one city inside it. A null city means the whole state. */
-    public record Place(@NotNull Long stateId, Long cityId, BigDecimal price) {
+    public record Place(@NotNull Long stateId, Long cityId, @DecimalMax("9999999999.99") BigDecimal price) {
 
         public VehicleService.CityRef toRef() {
             return new VehicleService.CityRef(stateId, cityId, price);

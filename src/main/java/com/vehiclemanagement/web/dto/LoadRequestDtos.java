@@ -1,5 +1,6 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.constraints.DecimalMax;
 import com.vehiclemanagement.domain.LoadRequest;
 import com.vehiclemanagement.service.LoadRequestService;
 import jakarta.validation.constraints.Size;
@@ -25,11 +26,11 @@ public final class LoadRequestDtos {
                               @Size(max = 120) String toPlace,
                               Long goodsTypeId,
                               @Size(max = 160) String goods,
-                              BigDecimal weightTons,
+                              @DecimalMax("999999.99") BigDecimal weightTons,
                               Integer trucksRequired,
                               Long bodyTypeId,
                               LocalDate loadingDate,
-                              BigDecimal offeredPrice,
+                              @DecimalMax("9999999999.99") BigDecimal offeredPrice,
                               @Size(max = 120) String contactName,
                               String contactMobile,
                               @Size(max = 2000) String notes,

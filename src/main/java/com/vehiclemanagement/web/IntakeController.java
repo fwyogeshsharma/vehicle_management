@@ -250,7 +250,7 @@ public class IntakeController {
     @PatchMapping("/{id}")
     public IntakeDtos.Summary correct(@AuthenticationPrincipal Jwt jwt,
                                       @PathVariable long id,
-                                      @RequestBody IntakeDtos.CorrectRequest request) {
+                                      @Valid @RequestBody IntakeDtos.CorrectRequest request) {
         VehicleIntake saved = intake.correct(id, Principal.username(jwt),
                 request.plate(), request.mobiles(), request.company(), request.driverName(),
                 request.bodyTypeId(), request.capacityId(), request.places(),
@@ -259,13 +259,13 @@ public class IntakeController {
         return IntakeDtos.Summary.from(saved, null, intake.notesOf(id));
     }
 
-    @Operation(summary = "Throw an intake away, permanently",
-            description = "Unreadable, not a truck, or already on file. **Deletes the row and "
-                    + "its photos**: there is no undo, and the id answers 404 afterwards. Only "
-                    + "an unreviewed intake; a completed one is a vehicle's provenance and is "
-                    + "refused with 409. DELETE /api/intake/{id} does the same; this POST form "
-                    + "remains for existing callers and accepts an optional reason, which is "
-                    + "logged.")
+    @Operation(summary = "Delete an intake (soft delete)",
+            description = "Unreadable, not a truck, or already on file. The row and its photos are "
+                    + "**kept**, marked DISCARDED: it leaves the worklist tabs and stays in the "
+                    + "administrator's entries-by-user report. Only an unreviewed intake; a "
+                    + "completed or already deleted one is refused with 409. "
+                    + "DELETE /api/intake/{id} does the same; this POST form remains for existing "
+                    + "callers and accepts an optional reason.")
     @PostMapping("/{id}/discard")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void discard(@AuthenticationPrincipal Jwt jwt,
@@ -274,7 +274,7 @@ public class IntakeController {
         intake.discard(id, Principal.username(jwt), body == null ? null : body.reason());
     }
 
-    @Operation(summary = "Delete an intake and its photos",
+    @Operation(summary = "Delete an intake",
             description = "The same as POST /api/intake/{id}/discard, without a reason.")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

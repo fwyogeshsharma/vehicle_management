@@ -85,6 +85,30 @@ class IntakeActivityIT extends ApiTest {
     }
 
     @Test
+    @DisplayName("a deleted entry leaves the worklist but is still counted and listed")
+    void deleted_entries_stay_in_the_report() {
+        long kept = entry(ramesh, "2026-11-10 09:00:00");
+        long gone = entry(ramesh, "2026-11-10 10:00:00");
+
+        assertThat(delete("/api/intake/" + gone, admin).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        JsonNode open = get("/api/intake?tab=ALL", admin).getBody().get("items");
+        assertThat(open).hasSize(1);
+        assertThat(open.get(0).get("id").asLong()).isEqualTo(kept);
+        assertThat(get("/api/intake/activity/uploaders", admin).getBody().get(0)
+                .get("total").asInt()).isEqualTo(2);
+        assertThat(get("/api/intake/activity/daily?user_id=" + ramesh, admin).getBody()
+                .get("total").asInt()).isEqualTo(2);
+        JsonNode rows = get("/api/intake/activity/entries?user_id=" + ramesh + "&date=2026-11-10",
+                admin).getBody();
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).get("id").asLong()).isEqualTo(gone);
+        assertThat(rows.get(0).get("review_status").asText()).isEqualTo("DISCARDED");
+        assertThat(rows.get(0).get("reviewed_by").asText()).isNotBlank();
+    }
+
+    @Test
     @DisplayName("only an administrator may see it; a bad time zone is a field error")
     void admin_only() {
         var desk = users.create("Desk Staff", "9800000002", UserType.STAFF);

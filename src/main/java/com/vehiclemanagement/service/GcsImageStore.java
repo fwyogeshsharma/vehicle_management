@@ -22,8 +22,8 @@ import org.slf4j.LoggerFactory;
  * Code that also thought it owned expiry would be a second, disagreeing answer to the same
  * question — and the one that deletes a photo a telecaller still needs.
  *
- * <p>{@link #delete} is the one exception, and it is not expiry: it removes the photos of an
- * intake a CSR has discarded, and only those, when that row is deleted.
+ * <p>{@link #delete} removes one object on request. It is not expiry, and discarding an intake
+ * no longer calls it: a discarded entry keeps its photos.
  */
 public class GcsImageStore implements ImageStore {
 

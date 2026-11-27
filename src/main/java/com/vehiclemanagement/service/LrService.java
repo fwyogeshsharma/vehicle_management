@@ -369,6 +369,9 @@ public class LrService {
                 ? Normalizer.registration(typed, "vehicle_number")
                 : vehicle == null ? null : vehicle.getRegistrationNumber());
 
+        if (req.bodyTypeId() != null && !bodyTypes.existsById(req.bodyTypeId())) {
+            throw new FieldValidationException("body_type_id", "That truck type is not on the list.");
+        }
         Long bodyTypeId = req.bodyTypeId() != null ? req.bodyTypeId()
                 : vehicle == null ? null : vehicle.getBodyTypeId();
         lr.setBodyTypeId(bodyTypeId);
@@ -401,15 +404,23 @@ public class LrService {
                 : driver == null ? null : driver.getMobile());
     }
 
+    /** The largest amount the money columns, NUMERIC(12,2), can hold. */
+    private static final BigDecimal LARGEST_AMOUNT = new BigDecimal("9999999999.99");
+
     private void applyCharges(LorryReceipt lr, Request req) {
-        lr.setFreightCharges(money(req.freightCharges()));
-        lr.setLoadingCharges(money(req.loadingCharges()));
-        lr.setUnloadingCharges(money(req.unloadingCharges()));
-        lr.setOtherCharges(money(req.otherCharges()));
-        lr.setAdvance(money(req.advance()));
+        lr.setFreightCharges(money(req.freightCharges(), "freight_charges"));
+        lr.setLoadingCharges(money(req.loadingCharges(), "loading_charges"));
+        lr.setUnloadingCharges(money(req.unloadingCharges(), "unloading_charges"));
+        lr.setOtherCharges(money(req.otherCharges(), "other_charges"));
+        lr.setAdvance(money(req.advance(), "advance"));
 
         BigDecimal total = lr.getFreightCharges().add(lr.getLoadingCharges())
                 .add(lr.getUnloadingCharges()).add(lr.getOtherCharges());
+        // Each charge fits its column and the sum still may not.
+        if (total.compareTo(LARGEST_AMOUNT) > 0) {
+            throw new FieldValidationException("total_charges",
+                    "The charges add up to more than " + LARGEST_AMOUNT.toPlainString() + ".");
+        }
         // ck_lr_advance enforces this too. Checked here as well so the caller gets a message
         // naming the field rather than a translated constraint violation.
         if (lr.getAdvance().compareTo(total) > 0) {
@@ -418,10 +429,10 @@ public class LrService {
         }
     }
 
-    private static BigDecimal money(BigDecimal value) {
+    private static BigDecimal money(BigDecimal value, String field) {
         BigDecimal v = value == null ? BigDecimal.ZERO : value;
         if (v.signum() < 0) {
-            throw new FieldValidationException("charges", "Charges cannot be negative.");
+            throw new FieldValidationException(field, "This cannot be negative.");
         }
         return v.setScale(2, RoundingMode.HALF_UP);
     }

@@ -73,8 +73,8 @@ public interface VehicleIntakeRepository extends JpaRepository<VehicleIntake, Lo
     /**
      * Everyone who has added at least one entry, with their running total.
      *
-     * <p>A discarded entry is deleted outright, so it is not counted: the totals are what is
-     * still on the system, not a log of everything ever sent.
+     * <p>Every status counts, DISCARDED included: deleting an entry from the worklist does not
+     * unsend it.
      */
     @Query(value = """
             SELECT u.id AS "userId", u.name AS "name", count(*) AS "total"

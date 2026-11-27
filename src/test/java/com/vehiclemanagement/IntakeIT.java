@@ -750,8 +750,8 @@ class IntakeIT extends ApiTest {
     }
 
     @Test
-    @DisplayName("discarding deletes the row and its photos")
-    void discarding_deletes_permanently() {
+    @DisplayName("discarding keeps the row and its photos, and takes it off the worklist")
+    void discarding_is_a_soft_delete() {
         long id = idOf(uploadPhotos(2));
         List<String> keys = intake.get(id).getImageKeys();
         assertThat(keys).hasSize(2).allMatch(images::exists);
@@ -760,13 +760,22 @@ class IntakeIT extends ApiTest {
                 body("reason", "not a truck"));
 
         assertThat(discarded.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(get("/api/intake/" + id, token).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM vehicle_intake WHERE id = ?",
-                Long.class, id)).isZero();
-        assertThat(keys).noneMatch(images::exists);
+        Map<String, Object> row = jdbc.queryForMap("SELECT review_status, review_note,"
+                + " reviewed_by, reviewed_at FROM vehicle_intake WHERE id = ?", id);
+        assertThat(row.get("review_status")).isEqualTo("DISCARDED");
+        assertThat(row.get("review_note")).isEqualTo("not a truck");
+        assertThat(row.get("reviewed_by")).isNotNull();
+        assertThat(row.get("reviewed_at")).isNotNull();
+        assertThat(keys).allMatch(images::exists);
+        for (String tab : List.of("ALL", "TO_CALL", "WAITING", "FAILED", "COMPLETED")) {
+            assertThat(get("/api/intake?tab=" + tab, token).getBody().get("items"))
+                    .as(tab).noneMatch(item -> item.get("id").asLong() == id);
+        }
+        // Gone as far as the desk is concerned: nothing more can be done to it.
         assertThat(post("/api/intake/" + id + "/discard", token, body("reason", "again"))
-                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post("/api/intake/" + id + "/retry", token, null).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
@@ -776,8 +785,8 @@ class IntakeIT extends ApiTest {
 
         assertThat(delete("/api/intake/" + id, token).getStatusCode())
                 .isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(get("/api/intake/" + id, token).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(jdbc.queryForObject("SELECT review_status FROM vehicle_intake WHERE id = ?",
+                String.class, id)).isEqualTo("DISCARDED");
     }
 
     @Test

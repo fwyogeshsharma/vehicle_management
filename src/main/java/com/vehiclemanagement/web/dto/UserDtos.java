@@ -1,5 +1,7 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 import com.vehiclemanagement.domain.User;
 import com.vehiclemanagement.domain.UserRole;
 import com.vehiclemanagement.domain.UserType;
@@ -49,18 +51,18 @@ public final class UserDtos {
         }
     }
 
-    public record CreateRequest(@NotBlank String name,
+    public record CreateRequest(@NotBlank @Size(max = 120) String name,
                                 @NotBlank String mobile,
                                 @NotNull UserType userType) {
     }
 
     /** Deliberately has no {@code userType}: changing a role is administrator-only, and separate. */
-    public record UpdateRequest(@NotBlank String name,
+    public record UpdateRequest(@NotBlank @Size(max = 120) String name,
                                 @NotBlank String mobile,
                                 String altMobile,
-                                String email,
+                                @Email @Size(max = 255) String email,
                                 Long cityId,
-                                String notes) {
+                                @Size(max = 2000) String notes) {
     }
 
     /** Changing what somebody IS. Distinct from {@link RoleRequest}, which is what they may do. */
@@ -85,7 +87,7 @@ public final class UserDtos {
                                         @NotBlank String newPassword) {
     }
 
-    public record JoinCompanyRequest(@NotNull Long companyId, String position, boolean primary) {
+    public record JoinCompanyRequest(@NotNull Long companyId, @Size(max = 32) String position, boolean primary) {
     }
 
     public record Membership(Long companyId, String companyName, String position,

@@ -1,5 +1,6 @@
 package com.vehiclemanagement.web.dto;
 
+import jakarta.validation.constraints.DecimalMax;
 import com.vehiclemanagement.domain.Consignor;
 import com.vehiclemanagement.domain.GoodsType;
 import com.vehiclemanagement.domain.LorryReceipt;
@@ -55,8 +56,8 @@ public final class LrDtos {
 
             Long goodsTypeId,
             @Size(max = 500) String goodsDescription,
-            BigDecimal weightKg,
-            Integer packages,
+            @DecimalMax("99999999.99") BigDecimal weightKg,
+            @jakarta.validation.constraints.Min(0) Integer packages,
 
             Long vehicleId,
             @Size(max = 20) String vehicleNumber,
@@ -66,11 +67,11 @@ public final class LrDtos {
             @Size(max = 128) String driverName,
             String driverMobile,
 
-            BigDecimal freightCharges,
-            BigDecimal loadingCharges,
-            BigDecimal unloadingCharges,
-            BigDecimal otherCharges,
-            BigDecimal advance,
+            @DecimalMax("9999999999.99") BigDecimal freightCharges,
+            @DecimalMax("9999999999.99") BigDecimal loadingCharges,
+            @DecimalMax("9999999999.99") BigDecimal unloadingCharges,
+            @DecimalMax("9999999999.99") BigDecimal otherCharges,
+            @DecimalMax("9999999999.99") BigDecimal advance,
 
             @Size(max = 500) String specialInstructions,
             @Size(max = 2000) String notes) {

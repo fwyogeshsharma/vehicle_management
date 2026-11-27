@@ -6,6 +6,7 @@ import com.vehiclemanagement.domain.GoodsType;
 import com.vehiclemanagement.exception.ApiException;
 import com.vehiclemanagement.exception.ConstraintErrors;
 import com.vehiclemanagement.exception.FieldValidationException;
+import com.vehiclemanagement.repo.BodyTypeRepository;
 import com.vehiclemanagement.repo.FreightLaneRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,11 @@ public class LaneService {
     private final GeoService geo;
     private final GoodsTypeService goodsTypes;
 
-    public LaneService(FreightLaneRepository lanes, GeoService geo, GoodsTypeService goodsTypes) {
+    private final BodyTypeRepository bodyTypes;
+
+    public LaneService(FreightLaneRepository lanes, GeoService geo, GoodsTypeService goodsTypes,
+                       BodyTypeRepository bodyTypes) {
+        this.bodyTypes = bodyTypes;
         this.lanes = lanes;
         this.geo = geo;
         this.goodsTypes = goodsTypes;
@@ -129,6 +134,9 @@ public class LaneService {
         // keeps "runs all year, Apr-Jul" -- which is nonsense somebody would then act on --
         // out of the table.
         lane.setSeason(lane.isSeasonal() ? Normalizer.clean(req.season()) : null);
+        if (req.bodyTypeId() != null && !bodyTypes.existsById(req.bodyTypeId())) {
+            throw new FieldValidationException("body_type_id", "That truck type is not on the list.");
+        }
         lane.setBodyTypeId(req.bodyTypeId());
         lane.setSource(Normalizer.clean(req.source()));
         lane.setSourceMobile(Normalizer.optionalMobile(req.sourceMobile(), "source_mobile"));

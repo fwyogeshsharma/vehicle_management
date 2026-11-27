@@ -2,11 +2,13 @@ package com.vehiclemanagement.web;
 
 import com.vehiclemanagement.domain.User;
 import com.vehiclemanagement.domain.VehicleIntake;
+import com.vehiclemanagement.exception.FieldValidationException;
 import com.vehiclemanagement.service.BodyTypeService;
 import com.vehiclemanagement.service.CapacityService;
 import com.vehiclemanagement.service.GeoService;
 import com.vehiclemanagement.service.GoodsTypeService;
 import com.vehiclemanagement.service.IntakeService;
+import com.vehiclemanagement.service.Normalizer;
 import com.vehiclemanagement.service.UploadLinkService;
 import com.vehiclemanagement.web.dto.IntakeDtos;
 import com.vehiclemanagement.web.dto.MasterDtos;
@@ -82,7 +84,8 @@ public class PublicUploadController {
     }
 
     @Operation(summary = "Send photos of a truck, as the link's owner",
-            description = "Public. Every field is optional, photos included. The reporter is the "
+            description = "Public. At least a photo or `reported_mobile` is required, and a "
+                    + "number must be 10 digits starting 6-9 (422 otherwise); everything else is optional. The reporter is the "
                     + "link's owner and cannot be set. `owner` is whoever owns the truck, "
                     + "`places` is JSON `[{\"state_id\":1,\"city_id\":2}]` (city_id null = the "
                     + "whole state), `capacity_id` a row of `capacities`.")
@@ -99,12 +102,20 @@ public class PublicUploadController {
 
         User sender = links.resolve(token);
         links.checkAllowance(sender.getId());
+        String mobile = intake.requireSomethingToWorkFrom(images, reportedMobile);
+        // The same rules the desk meets when this becomes a vehicle, said while the sender can
+        // still fix it.
+        String plate = Normalizer.optionalRegistration(reportedPlate, "reported_plate");
+        if (owner != null && owner.strip().length() > 120) {
+            throw new FieldValidationException("owner",
+                    "At most 120 characters.");
+        }
 
         VehicleIntake saved = intake.upload(images, IntakeService.Report
                 // The name and mobile the sender typed are a PERSON's -- the driver, or the
                 // owner who drives -- so they are filed as the driver's name and mobile, not as
                 // a company and its number. A company is only ever named by the CSR.
-                .of(reportedPlate, reportedMobile, null, sender.getName(),
+                .of(plate, mobile, null, sender.getName(),
                         sender.getMobile(), IntakeController.parseCapturedAt(capturedAt),
                         null, null, null)
                 .withDriverName(owner)
